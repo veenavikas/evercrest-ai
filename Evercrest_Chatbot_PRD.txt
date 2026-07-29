@@ -1,0 +1,1002 @@
+Evercrest Tenant Work Order Chatbot — Product Requirements Document
+Version: 1.0
+Prepared by: Digital IT Hub
+Date: 25 June 2026
+Status: Build-ready specification
+
+1. Executive Summary
+The Evercrest Tenant Work Order Chatbot is a production-grade, AI-powered conversational system that allows tenants of a property management organization to report maintenance issues and request work orders through natural language chat, with automated email dispatch to the relevant maintenance/admin staff, full administrative oversight, and embedded analytics.
+This document specifies the complete system — application logic, AI integration, authentication, database, administrative tooling, and infrastructure — as a single, build-ready PRD. It is structured so that any engineer (or an AI coding agent such as Claude Code) can implement the system end-to-end from this document alone.
+1.1 Goals
+	•	Allow tenants to describe a maintenance issue conversationally and have the system structure it into a formal work order.
+	•	Automatically notify the correct staff/admin via email when a work order is created.
+	•	Give administrators full visibility into conversations, work orders, and system health through a dashboard with embedded analytics.
+	•	Authenticate all users (tenants and admins) via secure, passwordless magic links, restricted to a managed whitelist.
+	•	Run on a cost-efficient AI inference layer (Groq) instead of OpenAI, with no loss of functionality.
+	•	Be deployable on a single VPS with a clean CI/CD pipeline.
+1.2 Non-Goals
+	•	This system does not handle payments, billing, or lease management.
+	•	This system does not replace a full property management ERP — it is a focused work-order intake and tracking tool.
+	•	Multi-language support is out of scope for v1 (English only), though the schema is designed to allow it later.
+
+2. System Overview
+2.1 User Roles
+Role
+Description
+Access
+Tenant
+An end user reporting a maintenance/work issue via chat
+Chat UI, own work order history
+Admin
+Property management staff who manage work orders
+Full admin dashboard: all conversations, all work orders, system logs, analytics
+System (service account)
+Internal automation (email dispatch, AI calls)
+No UI — backend only
+
+2.2 Core User Journeys
+Journey A — Tenant reports an issue
+	•	Tenant visits the landing page and clicks "Sign in."
+	•	Tenant enters their email; if whitelisted, receives a magic link.
+	•	Tenant clicks the link, is authenticated, and lands on the chat interface.
+	•	Tenant describes their issue in natural language (e.g., "My kitchen sink has been leaking since yesterday").
+	•	The AI (via Groq) asks clarifying questions if needed (unit number, urgency, preferred access time) and then confirms a structured work order summary.
+	•	On confirmation, a Work Order record is created, and an email is automatically dispatched to the relevant admin/maintenance distribution list.
+	•	Tenant sees a confirmation message with a work order reference number and can view its status later.
+Journey B — Admin manages work orders
+	•	Admin signs in via magic link (whitelisted admin email).
+	•	Admin lands on the Admin Dashboard, seeing a live feed of new work orders and conversations.
+	•	Admin can open any conversation transcript, view the structured work order, change its status (New → Acknowledged → In Progress → Resolved → Closed), and add internal notes.
+	•	Admin can view analytics: volume over time, issue category breakdown, average resolution time, and SLA breaches.
+	•	Admin can view system/audit logs (auth events, email dispatch logs, AI call logs) for troubleshooting and compliance.
+Journey C — Email notification loop
+	•	Work order created → system sends a "New Work Order" email to the admin distribution list via SMTP.
+	•	Work order status changes → optional status-update email to the tenant.
+	•	All outbound emails are logged in the email_logs table regardless of delivery success/failure.
+
+3. Technology Stack
+This system matches the target production stack as specified by the client-side product requirements:
+Layer
+Technology
+Frontend framework
+Next.js 14+ (App Router)
+Backend runtime
+Node.js (within Next.js API routes / route handlers)
+ORM
+Drizzle ORM
+Database (production)
+PostgreSQL (managed or self-hosted on VPS)
+Database (local dev)
+SQLite (via Drizzle's SQLite driver, schema-compatible with Postgres target)
+AI inference
+Groq API (Llama 3.3 70B / Llama 3.1 8B as needed — see Section 6)
+Email delivery
+Free SMTP provider (e.g. Gmail SMTP / Brevo free tier / Zoho Mail free SMTP) via Nodemailer
+Authentication
+Custom passwordless magic-link system (JWT-based tokens, email delivery via the same SMTP layer)
+Hosting
+VPS (Ubuntu), reverse proxy (Nginx), process manager (PM2), SSL (Let's Encrypt / Certbot)
+CI/CD
+GitHub Actions
+Charting (admin analytics)
+Recharts (React)
+
+3.1 Why Groq
+Groq is used in place of OpenAI for all AI inference needs (chat responses, work-order data extraction, and dashboard analytics summarization) because it offers significantly lower per-token cost and very low latency for open-weight models such as Llama 3.x, while remaining OpenAI-compatible enough in API shape to require minimal code changes. All three AI-dependent features in this system are designed around a single shared Groq client module (Section 6).
+3.2 Why a Free SMTP Tool
+Magic-link emails and work-order notification emails are both transactional, low-volume (expected to be a few hundred emails/month at this stage), and do not require a paid transactional email service. A free-tier SMTP provider (or an existing organizational mailbox, e.g. Gmail/Google Workspace SMTP or Zoho Mail) is sufficient and keeps the cost of this system near-zero. The system is designed so the SMTP provider can be swapped later (e.g. to Postmark or SES) by changing only environment variables — no code changes.
+4. System Architecture
+4.1 High-Level Architecture
+                         ┌─────────────────────────┐
+                         │      Tenant Browser      │
+                         │   (Landing Page + Chat)  │
+                         └────────────┬─────────────┘
+                                      │ HTTPS
+                                      ▼
+                         ┌─────────────────────────┐
+                         │   Nginx Reverse Proxy    │
+                         │   (SSL termination)      │
+                         └────────────┬─────────────┘
+                                      │
+                                      ▼
+                ┌────────────────────────────────────────┐
+                │        Next.js Application (Node)        │
+                │  ┌──────────────┐   ┌──────────────────┐ │
+                │  │  Public Pages │   │   API Routes      │ │
+                │  │  /            │   │  /api/auth/*      │ │
+                │  │  /chat        │   │  /api/chat/*       │ │
+                │  │  /admin/*     │   │  /api/work-orders/*│ │
+                │  └──────────────┘   │  /api/admin/*      │ │
+                │                     └─────────┬──────────┘ │
+                └───────────────────────────────┼────────────┘
+                                                  │
+            ┌─────────────────────────────────────┼───────────────────────┐
+            ▼                                     ▼                       ▼
+  ┌───────────────────┐               ┌────────────────────┐   ┌────────────────────┐
+  │   Groq API         │               │   PostgreSQL DB     │   │  SMTP Provider      │
+  │  (chat, extraction,│               │  (Drizzle ORM)      │   │  (Nodemailer)       │
+  │   analytics)        │               │                     │   │  Magic links +      │
+  └───────────────────┘               └────────────────────┘   │  notifications      │
+                                                                  └────────────────────┘
+
+4.2 Request Flow — Chat Message
+	•	Tenant sends a message from /chat → POST /api/chat/message.
+	•	Route handler validates the session (see Section 5), loads conversation history from messages table.
+	•	Handler calls the shared Groq client (lib/ai/groq-client.ts) with the conversation history + system prompt.
+	•	Groq returns a response. If the AI determines enough information has been gathered, it also returns a structured JSON extraction (issue category, urgency, unit number, description) — see Section 6.2.
+	•	Response is persisted to messages. If a structured extraction was returned, a work_orders row is created/updated.
+	•	If a new work order was just created, the email dispatch job fires asynchronously (Section 7).
+	•	Response streamed/returned to the tenant UI.
+4.3 Environment Strategy
+Environment
+Purpose
+Database
+Branch
+Local development
+Engineer machines
+SQLite file
+feature branches
+Staging
+Pre-production validation
+PostgreSQL (staging instance)
+staging
+Production
+Live system
+PostgreSQL (production instance)
+production
+
+
+5. Authentication System
+5.1 Requirements Recap
+	•	Passwordless magic-link authentication only. No password field anywhere in the system.
+	•	Public sign-up is disabled. Only emails present in the allowed_emails whitelist table may request a magic link.
+	•	Verified identity is forwarded to backend logic via the same mechanism used internally (we standardize on session-based auth rather than literal HTTP headers from a third-party IdP, since this system owns its own auth — see 5.5 for the header-compatibility note).
+5.2 Magic Link Flow
+Tenant/Admin                 Next.js App                  Database          SMTP
+     │                            │                            │              │
+     │  1. Enter email            │                            │              │
+     ├───────────────────────────►│                            │              │
+     │                            │ 2. Check allowed_emails     │              │
+     │                            ├───────────────────────────►│              │
+     │                            │ 3. Email is whitelisted     │              │
+     │                            │◄───────────────────────────┤              │
+     │                            │ 4. Generate signed token     │              │
+     │                            │    (JWT, 15 min expiry)      │              │
+     │                            │ 5. Store login_tokens row    │              │
+     │                            ├───────────────────────────►│              │
+     │                            │ 6. Send email with link       │              │
+     │                            ├──────────────────────────────────────────►│
+     │  7. Receives email          │                            │              │
+     │◄─────────────────────────────────────────────────────────────────────┤
+     │  8. Clicks link              │                            │              │
+     ├───────────────────────────►│                            │              │
+     │                            │ 9. Validate token (signature,│              │
+     │                            │    expiry, single-use)        │              │
+     │                            ├───────────────────────────►│              │
+     │                            │ 10. Mark token used,          │              │
+     │                            │     create session            │              │
+     │                            ├───────────────────────────►│              │
+     │  11. Set session cookie,    │                            │              │
+     │      redirect to /chat or   │                            │              │
+     │      /admin                 │                            │              │
+     │◄───────────────────────────┤                            │              │
+
+5.3 Token Design
+	•	Magic link tokens are signed JWTs containing { email, purpose: "login", iat, exp }, signed with AUTH_SECRET.
+	•	Expiry: 15 minutes.
+	•	Single-use: on verification, the corresponding login_tokens row is marked used_at; a reused token is rejected even if not expired.
+	•	On successful verification, a session is created: an HTTP-only, Secure, SameSite=Lax cookie containing a signed session JWT { userId, email, role, iat, exp }, expiry 7 days, refreshed on activity.
+5.4 Email Whitelisting
+	•	allowed_emails table stores every email permitted to request a magic link, plus their intended role (tenant or admin).
+	•	POST /api/auth/request-link checks this table before sending any email. If the email is not present, the API returns a generic success-like response (e.g. "If this email is registered, a link has been sent") to avoid leaking which emails are valid — this is a security best practice, not optional.
+	•	Admins manage this table through the Admin Dashboard (Section 9.4) — no redeploy required to add/remove an allowed email.
+5.5 Header-Forwarding Compatibility Note
+The original infrastructure brief described an external auth proxy forwarding identity via oai-authenticated-user-email / oai-authenticated-user-full-name headers. Because this PRD specifies the application as owning its own complete auth system (rather than sitting behind a third-party identity proxy), the application uses session cookies as its primary trust mechanism. For architectural compatibility, the system additionally exposes an internal middleware hook (middleware.ts) that, if these headers are present and the request originates from a configured trusted proxy IP, will auto-provision a session — this keeps the system pluggable behind such a proxy in the future without requiring it for v1.
+5.6 Admin Elevation
+	•	A user's role (tenant | admin) is set in the allowed_emails table and copied onto the users row at first login.
+	•	All /admin/* pages and /api/admin/* routes check session.role === 'admin' server-side (in middleware and again in each route handler — defense in depth).
+
+6. AI Integration (Groq)
+6.1 Shared Groq Client
+All AI calls go through a single module: lib/ai/groq-client.ts.
+// lib/ai/groq-client.ts
+import Groq from "groq-sdk";
+ 
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+ 
+export const MODELS = {
+  CHAT: "llama-3.3-70b-versatile",      // conversational responses
+  EXTRACTION: "llama-3.1-8b-instant",    // fast structured extraction
+  ANALYTICS: "llama-3.3-70b-versatile",  // dashboard summarization
+} as const;
+ 
+export async function groqChat(params: {
+  model: string;
+  messages: { role: "system" | "user" | "assistant"; content: string }[];
+  jsonMode?: boolean;
+  temperature?: number;
+}) {
+  const completion = await groq.chat.completions.create({
+    model: params.model,
+    messages: params.messages,
+    temperature: params.temperature ?? 0.4,
+    response_format: params.jsonMode ? { type: "json_object" } : undefined,
+  });
+  return completion.choices[0].message.content;
+}
+
+Environment variable required: GROQ_API_KEY. Never exposed client-side; only used in server-side route handlers.
+6.2 Feature 1 — Conversational Chat Responses
+	•	Model: llama-3.3-70b-versatile
+	•	System prompt instructs the model to act as a property maintenance intake assistant: ask for unit number, issue category, description, urgency, and preferred access time if not already provided; otherwise confirm and summarize.
+	•	Flow: every tenant message + full prior conversation history (capped at the last 20 messages for context-window/cost efficiency) is sent to Groq; the streamed response is shown in the chat UI.
+6.3 Feature 2 — Work Order Data Extraction
+	•	Model: llama-3.1-8b-instant (fast + cheap, used for structured extraction, not conversation)
+	•	Trigger: after each tenant message, run an extraction pass in parallel with the chat response.
+	•	Mode: jsonMode: true, with a system prompt instructing the model to output a strict JSON object matching the work_orders schema fields (category, urgency, unit_number, description, ready_to_submit: boolean).
+	•	Logic: when ready_to_submit === true and the tenant confirms, the application creates a work_orders row from the extracted fields.
+6.4 Feature 3 — Admin Dashboard Analytics Summaries
+	•	Model: llama-3.3-70b-versatile
+	•	Trigger: on-demand, when an admin opens the Analytics tab, or on a scheduled daily cron.
+	•	Input: aggregated, pre-computed statistics (counts, averages — never raw PII) are passed to Groq, which returns a 2–4 sentence natural-language summary (e.g., "Work order volume is up 18% this week, driven primarily by plumbing issues in Building C. Average resolution time improved to 1.4 days.").
+	•	Important: the AI is given pre-aggregated numbers, not raw conversation text, both for cost efficiency and to avoid PII exposure to the summarization step.
+6.5 Cost & Rate-Limit Handling
+	•	All Groq calls wrapped in a retry-with-backoff helper (3 attempts, exponential backoff) to handle Groq's rate limits gracefully.
+	•	Token usage per call is logged to an ai_usage_logs table (model, prompt_tokens, completion_tokens, feature, created_at) for cost monitoring — this gives the admin a way to track AI spend over time even though Groq's cost is low.
+7. Database Schema (Drizzle ORM)
+All tables defined below using Drizzle's pg-core (PostgreSQL). The schema is designed to also run on Drizzle's sqlite-core for local development with equivalent field types (notes on SQLite differences inline where relevant).
+7.1 Schema File: `db/schema.ts`
+import {
+  pgTable, serial, text, varchar, timestamp, boolean,
+  integer, pgEnum, jsonb, uniqueIndex, index
+} from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+ 
+// ---------- Enums ----------
+export const roleEnum = pgEnum("role", ["tenant", "admin"]);
+export const workOrderStatusEnum = pgEnum("work_order_status", [
+  "new", "acknowledged", "in_progress", "resolved", "closed"
+]);
+export const workOrderUrgencyEnum = pgEnum("work_order_urgency", [
+  "low", "medium", "high", "emergency"
+]);
+export const emailStatusEnum = pgEnum("email_status", [
+  "queued", "sent", "failed"
+]);
+ 
+// ---------- Allowed Emails (Whitelist) ----------
+export const allowedEmails = pgTable("allowed_emails", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  role: roleEnum("role").notNull().default("tenant"),
+  addedBy: integer("added_by"), // FK -> users.id (admin who added this entry)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  emailIdx: uniqueIndex("allowed_emails_email_idx").on(table.email),
+}));
+ 
+// ---------- Users ----------
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  fullName: varchar("full_name", { length: 255 }),
+  role: roleEnum("role").notNull().default("tenant"),
+  unitNumber: varchar("unit_number", { length: 50 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastLoginAt: timestamp("last_login_at"),
+}, (table) => ({
+  emailIdx: uniqueIndex("users_email_idx").on(table.email),
+}));
+ 
+// ---------- Login Tokens (Magic Links) ----------
+export const loginTokens = pgTable("login_tokens", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  tokenHash: varchar("token_hash", { length: 255 }).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  requestIp: varchar("request_ip", { length: 64 }),
+}, (table) => ({
+  tokenIdx: uniqueIndex("login_tokens_hash_idx").on(table.tokenHash),
+  emailIdx: index("login_tokens_email_idx").on(table.email),
+}));
+ 
+// ---------- Conversations ----------
+export const conversations = pgTable("conversations", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
+  isArchived: boolean("is_archived").default(false).notNull(),
+}, (table) => ({
+  userIdx: index("conversations_user_idx").on(table.userId),
+}));
+ 
+// ---------- Messages ----------
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").notNull().references(() => conversations.id),
+  sender: varchar("sender", { length: 20 }).notNull(), // "tenant" | "assistant"
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  convIdx: index("messages_conversation_idx").on(table.conversationId),
+}));
+ 
+// ---------- Work Orders ----------
+export const workOrders = pgTable("work_orders", {
+  id: serial("id").primaryKey(),
+  referenceCode: varchar("reference_code", { length: 20 }).notNull(), // e.g. WO-20260625-1
+  conversationId: integer("conversation_id").notNull().references(() => conversations.id),
+  tenantId: integer("tenant_id").notNull().references(() => users.id),
+  category: varchar("category", { length: 100 }).notNull(), // plumbing/electrical/HVAC
+  description: text("description").notNull(),
+  unitNumber: varchar("unit_number", { length: 50 }),
+  urgency: workOrderUrgencyEnum("urgency").notNull().default("medium"),
+  status: workOrderStatusEnum("status").notNull().default("new"),
+  preferredAccessTime: varchar("preferred_access_time", { length: 255 }),
+  internalNotes: text("internal_notes"),
+  assignedAdminId: integer("assigned_admin_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  resolvedAt: timestamp("resolved_at"),
+  closedAt: timestamp("closed_at"),
+}, (table) => ({
+  refIdx: uniqueIndex("work_orders_ref_idx").on(table.referenceCode),
+  statusIdx: index("work_orders_status_idx").on(table.status),
+  tenantIdx: index("work_orders_tenant_idx").on(table.tenantId),
+  createdIdx: index("work_orders_created_idx").on(table.createdAt),
+}));
+ 
+// ---------- Email Logs ----------
+export const emailLogs = pgTable("email_logs", {
+  id: serial("id").primaryKey(),
+  toAddress: varchar("to_address", { length: 255 }).notNull(),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  template: varchar("template", { length: 100 }).notNull(), // magic_link/new_work_order/status_update
+  relatedWorkOrderId: integer("related_work_order_id").references(() => workOrders.id),
+  status: emailStatusEnum("status").notNull().default("queued"),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index("email_logs_status_idx").on(table.status),
+}));
+ 
+// ---------- AI Usage Logs ----------
+export const aiUsageLogs = pgTable("ai_usage_logs", {
+  id: serial("id").primaryKey(),
+  feature: varchar("feature", { length: 50 }).notNull(), // "chat" | "extraction" | "analytics"
+  model: varchar("model", { length: 100 }).notNull(),
+  promptTokens: integer("prompt_tokens").notNull(),
+  completionTokens: integer("completion_tokens").notNull(),
+  relatedConversationId: integer("related_conversation_id").references(() => conversations.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  featureIdx: index("ai_usage_feature_idx").on(table.feature),
+}));
+ 
+// ---------- System / Audit Logs ----------
+export const systemLogs = pgTable("system_logs", {
+  id: serial("id").primaryKey(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  // auth.login | auth.failed | work_order.created | work_order.status_changed | admin.whitelist_updated
+  actorUserId: integer("actor_user_id").references(() => users.id),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  eventIdx: index("system_logs_event_idx").on(table.eventType),
+  createdIdx: index("system_logs_created_idx").on(table.createdAt),
+}));
+ 
+// ---------- Relations ----------
+export const usersRelations = relations(users, ({ many }) => ({
+  conversations: many(conversations),
+  workOrders: many(workOrders),
+}));
+ 
+export const conversationsRelations = relations(conversations, ({ one, many }) => ({
+  user: one(users, { fields: [conversations.userId], references: [users.id] }),
+  messages: many(messages),
+  workOrder: many(workOrders),
+}));
+ 
+export const messagesRelations = relations(messages, ({ one }) => ({
+  conversation: one(conversations, { fields: [messages.conversationId], references: [conversations.id] }),
+}));
+ 
+export const workOrdersRelations = relations(workOrders, ({ one }) => ({
+  conversation: one(conversations, { fields: [workOrders.conversationId], references: [conversations.id] }),
+  tenant: one(users, { fields: [workOrders.tenantId], references: [users.id] }),
+  assignedAdmin: one(users, { fields: [workOrders.assignedAdminId], references: [users.id] }),
+}));
+
+7.2 SQLite (Local Dev) Notes
+For local development, replace pgTable/enums with sqliteTable and represent enums as text columns with a CHECK constraint or application-level validation, and jsonb as text (JSON-stringified). Drizzle's migration tooling (drizzle-kit) supports generating from either dialect — keep db/schema.ts as the Postgres source of truth and maintain a parallel db/schema.sqlite.ts for local dev if full type-parity is desired, or simply point local dev at a lightweight Postgres Docker container to avoid schema drift entirely (recommended).
+7.3 Migrations
+	•	Use drizzle-kit generate to produce SQL migration files from schema changes.
+	•	Use drizzle-kit migrate (run automatically by the CI/CD pipeline, Section 10) to apply migrations to staging/production on deploy.
+	•	Never edit a migration file that has already been applied to production — always generate a new one.
+7.4 Indexing Rationale
+	•	work_orders.status and work_orders.created_at are indexed since the Admin Dashboard's primary queries filter/sort by these.
+	•	messages.conversation_id is indexed since conversation transcripts are the most frequent read pattern.
+	•	system_logs.event_type and created_at are indexed for audit log filtering.
+7.5 Backup Strategy
+	•	Automated daily pg_dump to a separate backup volume/object storage (e.g., a low-cost S3-compatible bucket), retained for 30 days on a rolling basis.
+	•	Backup job runs as a cron on the VPS, outside the application process, and is logged to system_logs with event type system.backup_completed or system.backup_failed.
+8. API Contracts
+All API routes are implemented as Next.js Route Handlers under app/api/. All routes (except auth/request-link and auth/verify) require a valid session cookie. Admin routes additionally require role === "admin".
+8.1 Authentication
+`POST /api/auth/request-link`
+Request a magic link.
+Request body:
+{ "email": "tenant@example.com" }
+
+Response (always 200, regardless of whitelist status — see Section 5.4):
+{ "message": "If this email is registered, a login link has been sent." }
+
+Logic: Check allowed_emails. If found, generate token, insert login_tokens row, send email via SMTP. If not found, do nothing but return the same response.
+
+`GET /api/auth/verify?token=...`
+Verify a magic link token and create a session.
+Response (success): 302 Redirect to /chat (tenant) or /admin (admin), with Set-Cookie: session=<jwt>; HttpOnly; Secure; SameSite=Lax. Response (invalid/expired/used token): 302 Redirect to /login?error=invalid_token.
+
+`POST /api/auth/logout`
+Clears the session cookie. Response: 200 { "message": "Logged out" }
+
+8.2 Chat
+`POST /api/chat/message`
+Send a tenant message and receive the AI response.
+Request body:
+{
+  "conversationId": 123,
+  "message": "My kitchen sink has been leaking since yesterday"
+}
+
+If conversationId is omitted, a new conversation is created for the current session's user.
+Response:
+{
+  "conversationId": 123,
+  "reply": "Thanks for letting me know. Could you tell me your unit number and how urgent this feels — minor drip, or actively flooding?",
+  "workOrderDraft": {
+    "category": "plumbing",
+    "urgency": null,
+    "unitNumber": null,
+    "description": "Kitchen sink leaking since yesterday",
+    "readyToSubmit": false
+  }
+}
+
+When readyToSubmit becomes true and the tenant confirms (see /api/chat/confirm below), a work order is created.
+
+`POST /api/chat/confirm`
+Tenant confirms the drafted work order summary, finalizing creation.
+Request body:
+{ "conversationId": 123 }
+
+Response:
+{
+  "workOrder": {
+    "id": 45,
+    "referenceCode": "WO-20260625-0045",
+    "status": "new"
+  },
+  "message": "Your work order WO-20260625-0045 has been submitted. Our team will reach out shortly."
+}
+
+Side effect: triggers email dispatch to the admin distribution list (Section 9).
+
+`GET /api/chat/history?conversationId=123`
+Returns full message history for a conversation (used to hydrate the chat UI on reload).
+Response:
+{
+  "messages": [
+    { "id": 1, "sender": "tenant", "content": "...", "createdAt": "..." },
+    { "id": 2, "sender": "assistant", "content": "...", "createdAt": "..." }
+  ]
+}
+
+
+8.3 Tenant Work Orders
+`GET /api/work-orders/mine`
+Returns the current tenant's own work orders (history view).
+Response:
+{
+  "workOrders": [
+    { "id": 45, "referenceCode": "WO-20260625-0045", "category": "plumbing", "status": "in_progress", "createdAt": "..." }
+  ]
+}
+
+
+8.4 Admin — Work Orders
+`GET /api/admin/work-orders`
+List/filter all work orders.
+Query params: status, urgency, category, from, to, page, pageSize
+Response:
+{
+  "workOrders": [ { "...": "full work order record + tenant name/unit" } ],
+  "total": 132,
+  "page": 1,
+  "pageSize": 25
+}
+
+
+`PATCH /api/admin/work-orders/:id`
+Update status, assign admin, or add internal notes.
+Request body:
+{ "status": "acknowledged", "assignedAdminId": 3, "internalNotes": "Plumber scheduled for Thursday" }
+
+Response: updated work order object. Side effect: logs work_order.status_changed to system_logs; optionally sends a status-update email to the tenant if status changed.
+
+8.5 Admin — Conversations
+`GET /api/admin/conversations`
+List all conversations (live + archived), with filters for userId, dateRange, isArchived.
+`GET /api/admin/conversations/:id`
+Full transcript for a single conversation.
+
+8.6 Admin — Whitelist Management
+`GET /api/admin/allowed-emails`
+List the current whitelist.
+`POST /api/admin/allowed-emails`
+{ "email": "newtenant@example.com", "role": "tenant" }
+
+`DELETE /api/admin/allowed-emails/:id`
+Removes an entry (revokes future login ability; does not affect existing sessions until expiry).
+
+8.7 Admin — Analytics
+`GET /api/admin/analytics/summary?range=30d`
+Returns pre-aggregated stats plus an AI-generated natural-language summary (Section 6.4).
+Response:
+{
+  "totalWorkOrders": 87,
+  "byCategory": { "plumbing": 32, "electrical": 18, "hvac": 15, "other": 22 },
+  "byStatus": { "new": 5, "acknowledged": 8, "in_progress": 12, "resolved": 50, "closed": 12 },
+  "avgResolutionHours": 34.2,
+  "slaBreaches": 4,
+  "aiSummary": "Work order volume is up 18% this week, driven primarily by plumbing issues in Building C. Average resolution time improved to 1.4 days."
+}
+
+
+8.8 Admin — System Logs
+`GET /api/admin/system-logs?eventType=&from=&to=&page=`
+Paginated audit log viewer.
+`GET /api/admin/email-logs?status=&page=`
+Paginated email dispatch log viewer (for troubleshooting delivery issues).
+
+8.9 Error Handling Convention
+All error responses follow a consistent shape:
+{ "error": { "code": "UNAUTHORIZED", "message": "You must be signed in to perform this action." } }
+
+Standard codes: UNAUTHORIZED (401), FORBIDDEN (403), NOT_FOUND (404), VALIDATION_ERROR (400), RATE_LIMITED (429), INTERNAL_ERROR (500).
+9. Email Notification System (Free SMTP)
+9.1 SMTP Configuration
+The system uses Nodemailer with a free SMTP provider. Supported options (any one configured via environment variables):
+Provider
+Free tier limit
+SMTP host
+Gmail / Google Workspace
+~500 emails/day (personal Gmail)
+smtp.gmail.com:587 (requires an App Password, not the account password)
+Zoho Mail
+25 emails/day (free tier)
+smtp.zoho.com:587
+Brevo (formerly Sendinblue)
+300 emails/day (free tier)
+smtp-relay.brevo.com:587
+
+Environment variables:
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=notifications@evercrest.example.com
+SMTP_PASSWORD=<app password>
+SMTP_FROM_NAME="Evercrest Maintenance"
+ADMIN_NOTIFICATION_EMAILS=admin1@evercrest.example.com,admin2@evercrest.example.com
+
+9.2 Shared Mailer Module: `lib/email/mailer.ts`
+import nodemailer from "nodemailer";
+ 
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
+  secure: false, // STARTTLS on port 587
+  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
+});
+ 
+export async function sendEmail(params: {
+  to: string | string[];
+  subject: string;
+  html: string;
+  template: string;
+  relatedWorkOrderId?: number;
+}) {
+  // 1. Insert email_logs row with status "queued"
+  // 2. Attempt transporter.sendMail(...)
+  // 3. Update email_logs row to "sent" or "failed" + errorMessage
+}
+
+All email sends — magic links, new work order alerts, and status updates — go through this single function so every send is logged to email_logs without exception.
+9.3 Email Templates
+Template
+Trigger
+Recipient
+magic_link
+Tenant/admin requests login
+The requesting user
+new_work_order
+Tenant confirms a work order
+All addresses in ADMIN_NOTIFICATION_EMAILS
+status_update
+Admin changes work order status
+The tenant who filed it
+
+Each template is a simple, plain-styled HTML email (inline CSS for client compatibility) — no external image dependencies, since this is transactional mail, not marketing.
+9.4 Failure Handling
+	•	If sendEmail fails (SMTP error, rate limit, etc.), the email_logs row is marked failed with the error message, but the work order itself is still created — email delivery failure must never block the core workflow.
+	•	A daily check (visible on the Admin Dashboard's System Logs tab) surfaces any failed email rows so an admin can manually follow up or resend.
+
+10. Admin Dashboard — Page-by-Page Specification
+10.1 `/admin` — Overview
+	•	Summary cards: Open work orders, New today, Avg. resolution time, SLA breaches this week.
+	•	Live feed: most recent 10 conversations/work orders (auto-refresh every 30s via polling, or websocket if time allows — polling is sufficient for v1).
+10.2 `/admin/work-orders` — Work Order Management
+	•	Filterable, sortable table: Reference Code, Tenant, Unit, Category, Urgency, Status, Created, Assigned Admin.
+	•	Row click opens a detail drawer: full work order fields, linked conversation transcript (read-only), status dropdown, assign-to-admin dropdown, internal notes textarea (autosave).
+	•	Status changes write to system_logs and optionally trigger a status_update email.
+10.3 `/admin/conversations` — Conversation Logs
+	•	List of all conversations (live + archived), filterable by tenant, date range, and whether a work order was generated.
+	•	Click into a conversation for a read-only transcript view (tenant messages + AI responses), with a link to the resulting work order if one exists.
+10.4 `/admin/whitelist` — Email Whitelist Management
+	•	Table of all allowed_emails entries: email, role, added by, date added.
+	•	"Add Email" form: email + role dropdown (tenant/admin).
+	•	Remove button per row (with confirmation modal — this revokes future login ability).
+10.5 `/admin/analytics` — Analytics & Insights
+	•	Charts (Recharts): work order volume over time (line), breakdown by category (pie/bar), status distribution (bar), average resolution time trend (line).
+	•	AI-generated summary paragraph at the top (Section 6.4), refreshed on page load or via a "Regenerate" button.
+	•	Date range selector: 7d / 30d / 90d / custom.
+10.6 `/admin/system-logs` — Audit & System Logs
+	•	Two tabs: System/Audit Logs (auth events, status changes, whitelist changes) and Email Logs (every email attempt with status).
+	•	Filterable by event type / status and date range, paginated.
+10.7 `/admin/settings` — Admin Account & Config
+	•	View current AI usage (ai_usage_logs aggregated by day/feature) for cost monitoring (Section 6.5).
+	•	View configured SMTP provider (masked credentials) and a "Send test email" button.
+
+11. Tenant-Facing Pages
+11.1 `/` — Public Landing Page
+	•	Marketing/info content about the property/service (out of scope for detailed copywriting in this PRD — content team provides copy).
+	•	"Sign in" CTA leading to /login.
+11.2 `/login` — Magic Link Request
+	•	Single email input + "Send me a login link" button.
+	•	After submission, shows a confirmation message regardless of whitelist outcome (Section 5.4 / 8.1).
+11.3 `/chat` — Tenant Chat Interface
+	•	Standard chat UI: message history, input box, send button.
+	•	When the AI proposes a structured work order summary, render it as a distinct "confirmation card" within the chat (not just plain text) with an explicit "Confirm & Submit" button and an "Edit" option that lets the tenant correct a field before submitting.
+	•	After submission, show the reference code prominently and a link to "View my work orders."
+11.4 `/my-work-orders` — Tenant's Own History
+	•	Simple list of the tenant's own past work orders with status badges. Read-only.
+
+12. Non-Functional Requirements
+Category
+Requirement
+Security
+All cookies HttpOnly/Secure/SameSite=Lax; all admin routes double-checked server-side; SQL access only via Drizzle (parameterized) — no raw string interpolation.
+Performance
+Chat response P95 latency target: under 3 seconds (Groq's low latency makes this comfortably achievable).
+Reliability
+Email failures never block work order creation (Section 9.4).
+Observability
+Every auth event, status change, and email attempt is logged (system_logs, email_logs).
+Data retention
+Conversations and work orders retained indefinitely unless a deletion request is made; backups retained 30 days rolling.
+Accessibility
+Chat and dashboard UI should meet basic WCAG AA contrast and keyboard-navigation standards.
+
+
+13. Build Sequencing (Recommended Order)
+	•	Database schema + migrations (Section 7)
+	•	Auth system: whitelist, magic link request/verify, sessions (Section 5)
+	•	SMTP mailer module + magic link email (Section 9)
+	•	Groq client module + chat route (Sections 6.1–6.2)
+	•	Work order extraction + confirm/create flow (Section 6.3, 8.2)
+	•	New-work-order email notification (Section 9.3)
+	•	Tenant-facing pages: landing, login, chat, my-work-orders (Section 11)
+	•	Admin work orders + conversations pages (Sections 10.2–10.3)
+	•	Admin whitelist management page (Section 10.4)
+	•	Admin analytics (aggregation queries + Groq summary) (Section 10.5)
+	•	Admin system/email logs pages (Section 10.6)
+	•	CI/CD pipeline + VPS deployment + SSL (matches original infra scope)
+	•	QA pass, security review of auth/header logic, documentation handover
+This sequencing front-loads the pieces a competing team would need the most lead time on (auth + AI core loop), so the core tenant journey is demoable before the admin tooling is fully built out.
+14. Platform Expansion — Multi-Property Tenant Portal
+14.1 Scope Change Summary
+The system specified in Sections 1–13 covered the chatbot, work-order workflow, and administrative tooling. This section extends that system into a full multi-property tenant portal, adding:
+	•	Property and unit management (multiple buildings/complexes, each with its own units)
+	•	Amenity booking (gym, pool, clubhouse, etc., with calendar-based reservations)
+	•	Announcements/notices board
+	•	Document center (lease documents, policies)
+	•	Community/resident directory
+All new content (properties, amenities, announcements, documents, directory visibility) is managed exclusively by admins through the Admin Dashboard — there is no separate property-manager role in v1, and no public self-service content creation.
+Every module below is designed against the same patterns already established: Drizzle schema with indexes, Next.js route handlers with the standard error/auth conventions (Section 8.9, 5.6), and Groq used only where it adds real value (not forced into every feature).
+14.2 Multi-Property Data Model — Schema Additions
+These tables extend db/schema.ts from Section 7. Existing tables (users, allowed_emails, work_orders) are modified to reference a property/unit, noted below.
+// ---------- Properties ----------
+export const properties = pgTable("properties", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 100 }).notNull(), // used in property-specific URLs
+  addressLine1: varchar("address_line1", { length: 255 }).notNull(),
+  addressLine2: varchar("address_line2", { length: 255 }),
+  city: varchar("city", { length: 100 }).notNull(),
+  state: varchar("state", { length: 100 }).notNull(),
+  postalCode: varchar("postal_code", { length: 20 }).notNull(),
+  heroImageUrl: varchar("hero_image_url", { length: 500 }),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  slugIdx: uniqueIndex("properties_slug_idx").on(table.slug),
+}));
+ 
+// ---------- Units ----------
+export const units = pgTable("units", {
+  id: serial("id").primaryKey(),
+  propertyId: integer("property_id").notNull().references(() => properties.id),
+  unitNumber: varchar("unit_number", { length: 50 }).notNull(),
+  floor: varchar("floor", { length: 20 }),
+  bedroomCount: integer("bedroom_count"),
+  isOccupied: boolean("is_occupied").default(false).notNull(),
+}, (table) => ({
+  propertyIdx: index("units_property_idx").on(table.propertyId),
+  uniqueUnit: uniqueIndex("units_property_unit_idx").on(table.propertyId, table.unitNumber),
+}));
+ 
+// ---------- Amenities ----------
+export const amenities = pgTable("amenities", {
+  id: serial("id").primaryKey(),
+  propertyId: integer("property_id").notNull().references(() => properties.id),
+  name: varchar("name", { length: 255 }).notNull(), // "Rooftop Pool", "Fitness Center"
+  description: text("description"),
+  imageUrl: varchar("image_url", { length: 500 }),
+  requiresBooking: boolean("requires_booking").default(true).notNull(),
+  maxCapacity: integer("max_capacity"),
+  bookingSlotMinutes: integer("booking_slot_minutes").default(60).notNull(),
+  openTime: varchar("open_time", { length: 5 }).default("08:00").notNull(), // "HH:MM"
+  closeTime: varchar("close_time", { length: 5 }).default("22:00").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+}, (table) => ({
+  propertyIdx: index("amenities_property_idx").on(table.propertyId),
+}));
+ 
+// ---------- Amenity Bookings ----------
+export const amenityBookingStatusEnum = pgEnum("amenity_booking_status", [
+  "confirmed", "cancelled", "completed"
+]);
+ 
+export const amenityBookings = pgTable("amenity_bookings", {
+  id: serial("id").primaryKey(),
+  amenityId: integer("amenity_id").notNull().references(() => amenities.id),
+  tenantId: integer("tenant_id").notNull().references(() => users.id),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  status: amenityBookingStatusEnum("status").notNull().default("confirmed"),
+  partySize: integer("party_size").default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  cancelledAt: timestamp("cancelled_at"),
+}, (table) => ({
+  amenityTimeIdx: index("amenity_bookings_amenity_time_idx").on(table.amenityId, table.startTime),
+  tenantIdx: index("amenity_bookings_tenant_idx").on(table.tenantId),
+}));
+ 
+// ---------- Announcements ----------
+export const announcementPriorityEnum = pgEnum("announcement_priority", [
+  "normal", "important", "urgent"
+]);
+ 
+export const announcements = pgTable("announcements", {
+  id: serial("id").primaryKey(),
+  propertyId: integer("property_id").notNull().references(() => properties.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  body: text("body").notNull(),
+  priority: announcementPriorityEnum("priority").notNull().default("normal"),
+  publishedAt: timestamp("published_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdByAdminId: integer("created_by_admin_id").references(() => users.id),
+}, (table) => ({
+  propertyIdx: index("announcements_property_idx").on(table.propertyId),
+  publishedIdx: index("announcements_published_idx").on(table.publishedAt),
+}));
+ 
+// ---------- Documents ----------
+export const documentCategoryEnum = pgEnum("document_category", [
+  "lease", "policy", "notice", "other"
+]);
+ 
+export const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  propertyId: integer("property_id").references(() => properties.id), // null = global/all properties
+  tenantId: integer("tenant_id").references(() => users.id), // null = visible to all tenants of the property
+  category: documentCategoryEnum("category").notNull().default("policy"),
+  title: varchar("title", { length: 255 }).notNull(),
+  fileUrl: varchar("file_url", { length: 500 }).notNull(),
+  uploadedByAdminId: integer("uploaded_by_admin_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  propertyIdx: index("documents_property_idx").on(table.propertyId),
+  tenantIdx: index("documents_tenant_idx").on(table.tenantId),
+}));
+ 
+// ---------- Resident Directory ----------
+export const directoryEntries = pgTable("directory_entries", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => users.id),
+  propertyId: integer("property_id").notNull().references(() => properties.id),
+  displayName: varchar("display_name", { length: 255 }).notNull(),
+  unitNumber: varchar("unit_number", { length: 50 }),
+  showInDirectory: boolean("show_in_directory").default(false).notNull(), // opt-in, default OFF
+  contactEmailVisible: boolean("contact_email_visible").default(false).notNull(),
+  bio: text("bio"),
+}, (table) => ({
+  propertyIdx: index("directory_property_idx").on(table.propertyId),
+  tenantIdx: uniqueIndex("directory_tenant_idx").on(table.tenantId),
+}));
+
+14.3 Modifications to Existing Tables
+Table
+Change
+Reason
+users
+Add propertyId: integer references properties.id and unitId: integer references units.id (both nullable for admins)
+Every tenant now belongs to exactly one property/unit
+allowed_emails
+Add propertyId: integer references properties.id (nullable for admins, who may oversee multiple properties)
+Whitelist entries are property-scoped for tenants
+work_orders
+Add propertyId: integer references properties.id (denormalized from the tenant's property for fast filtering)
+Admin dashboard needs to filter work orders by property when managing multiple buildings
+conversations
+Add propertyId: integer references properties.id (denormalized, same reason)
+Same as above
+
+14.4 Privacy Default for the Directory
+directoryEntries.showInDirectory defaults to false. Tenants must explicitly opt in via their profile settings before appearing in the resident directory to anyone else — this is a deliberate privacy-by-default decision, not an oversight, and should not be changed without an explicit consent flow redesign.
+14.5 API Contracts — New Modules
+All routes follow the same auth and error conventions as Section 8. Tenant-facing routes are automatically scoped to session.propertyId; admin routes accept an explicit propertyId filter.
+Properties & Units
+`GET /api/properties` (public) — Lists active properties for the landing page property picker.
+{ "properties": [ { "id": 1, "name": "Evercrest Riverside", "slug": "riverside", "city": "Toronto", "heroImageUrl": "..." } ] }
+
+`GET /api/properties/:slug` (public) — Single property detail for its landing page.
+`GET /api/admin/properties` / `POST /api/admin/properties` / `PATCH /api/admin/properties/:id` — Standard CMS CRUD for admins.
+`GET /api/admin/properties/:id/units` / `POST .../units` — Manage units within a property.
+
+Amenities & Booking
+`GET /api/amenities` (tenant) — Lists amenities for the tenant's property.
+{ "amenities": [ { "id": 5, "name": "Rooftop Pool", "requiresBooking": true, "openTime": "08:00", "closeTime": "22:00" } ] }
+
+`GET /api/amenities/:id/availability?date=2026-07-01` (tenant) — Returns open slots for a given day, computed from bookingSlotMinutes minus existing amenityBookings.
+{ "slots": [ { "start": "09:00", "end": "10:00", "available": true }, { "start": "10:00", "end": "11:00", "available": false } ] }
+
+`POST /api/amenities/:id/bookings` (tenant) — Create a booking.
+{ "startTime": "2026-07-01T09:00:00Z", "partySize": 2 }
+
+Logic: server-side re-validates the slot is still free before committing (prevent race conditions on double-booking) — this check must happen inside a transaction, not just client-side.
+`GET /api/amenities/bookings/mine` (tenant) — Tenant's own upcoming/past bookings.
+`DELETE /api/amenities/bookings/:id` (tenant) — Cancel own booking (sets status: cancelled, does not hard-delete, for audit purposes).
+`GET /api/admin/amenities` / CRUD — Admin manages amenity definitions (name, capacity, hours, images).
+`GET /api/admin/amenities/bookings` — Admin view of all bookings, filterable by amenity/date/tenant.
+
+Announcements
+`GET /api/announcements` (tenant) — Active announcements for the tenant's property, sorted by priority then publishedAt descending, excluding expired ones.
+`GET /api/admin/announcements` / `POST` / `PATCH /:id` / `DELETE /:id` — Standard CMS CRUD.
+
+Documents
+`GET /api/documents` (tenant) — Documents visible to the tenant: property-wide (tenantId IS NULL) plus any addressed specifically to them.
+`GET /api/admin/documents` / `POST` (upload) / `DELETE /:id` — Admin manages documents. File upload uses the same VPS file-storage approach as Section 14.8 (static file serving, not a separate object-storage dependency for v1).
+
+Resident Directory
+`GET /api/directory` (tenant) — Lists only opted-in residents of the tenant's own property.
+{ "entries": [ { "displayName": "Jordan M.", "unitNumber": "4B", "bio": "..." } ] }
+
+Note: contactEmailVisible controls whether an email field is included per-entry; if false, no email is returned regardless of requester role.
+`GET /api/directory/me` / `PATCH /api/directory/me` (tenant) — Tenant manages their own directory visibility and bio.
+{ "showInDirectory": true, "contactEmailVisible": false, "bio": "Friendly neighbor, two cats." }
+
+`GET /api/admin/directory` — Admin can view all entries (including opted-out, for moderation purposes only — never exposed to other tenants).
+
+14.6 Groq Usage in New Modules
+Per the original instruction that Groq should power "all" AI-driven aspects of this system, two additional touchpoints are in scope:
+	•	Announcement drafting assistant (admin-only): On the admin announcement creation form, an optional "Draft with AI" button sends a short prompt (admin's bullet points) to Groq (llama-3.3-70b-versatile) and returns a polished announcement draft for the admin to edit before publishing. This is assistive only — admins always review before publishing, nothing is auto-published.
+	•	Directory bio suggestions (tenant-optional): When a tenant fills out their directory bio, an optional "Suggest a friendly bio" button can lightly rephrase their own input via Groq. Entirely optional, never runs without the tenant clicking it.
+No other new module requires AI — amenity booking and document access are deterministic, not generative, and forcing AI into them would add cost and latency with no user benefit.
+14.7 Landing Page — Full Specification & Copy
+The landing page is now a real, multi-property-aware marketing site — not a placeholder. It serves two audiences: prospective/general visitors learning about Evercrest properties, and existing tenants/admins signing in.
+Route: / (property-agnostic overview) and /properties/:slug (individual property page).
+14.7.1 Page Structure — `/` (Main Landing Page)
+Section 1 — Navigation Bar
+	•	Left: Evercrest logo/wordmark
+	•	Center/right: "Properties," "Amenities," "About"
+	•	Right: "Resident Sign In" button (leads to /login)
+Section 2 — Hero > Headline: Where Living Feels Effortless > Subheadline: Evercrest properties combine modern comfort with responsive, real-time support — so home always feels taken care of. > CTA buttons: "Explore Our Properties" (scrolls to Section 3) · "Resident Sign In"
+Section 3 — Property Showcase > Section heading: Our Properties > Body copy: From riverside residences to downtown high-rises, every Evercrest property is built around the same promise: a comfortable home and a responsive team behind it.
+This section renders a card grid, one card per active property (pulled from GET /api/properties), each showing the hero image, name, city, and a "View Property" link to /properties/:slug.
+Section 4 — Why Evercrest (Feature Highlights)
+Section heading: A Better Way to Live, A Better Way to Get Help
+Three or four feature blocks:
+	•	Instant Support, Anytime — Report a maintenance issue in seconds through our AI-assisted chat, no phone tag, no waiting on hold. Just describe what's wrong, and we'll take it from there.
+	•	Everything in One Place — Book amenities, check announcements, and access your lease documents, all from your resident portal.
+	•	A Connected Community — Get to know your neighbors through our opt-in resident directory, and stay in the loop with property announcements that actually reach you.
+	•	Always-On Visibility — Track every work order from submission to resolution. No more wondering if anyone saw your request.
+Section 5 — How It Works
+Section heading: Getting Help Takes Three Steps
+	•	Sign In Securely — Use your email to receive a one-time secure link. No passwords to remember.
+	•	Tell Us What's Wrong — Chat with our assistant the way you'd describe the issue to a friend.
+	•	We Take It From There — Your request becomes a tracked work order, and our team is notified immediately.
+Section 6 — Footer
+	•	Columns: Properties (dynamic list), Resident Portal (Sign In, My Work Orders), Company (About, Contact)
+	•	Copyright line: © 2026 Evercrest Residential. All rights reserved.
+14.7.2 Page Structure — `/properties/:slug` (Individual Property Page)
+Section 1 — Property Hero
+	•	Property hero image, name, full address, a 1–2 sentence description (admin-editable via properties.description)
+Section 2 — Amenities Preview > Section heading: Amenities at [Property Name]
+Card grid of that property's amenities (from GET /api/properties/:slug → amenities relation), each with image + name + short description. Not bookable from the public page — booking requires sign-in (drives sign-up/sign-in conversion).
+Section 3 — Resident CTA > Heading: Already Call [Property Name] Home? > Body: Sign in to your resident portal to book amenities, report maintenance issues, and stay connected with your community. > CTA: "Resident Sign In"
+14.7.3 Copy Tone Notes
+All copy above is written in a warm, plain-spoken, reassuring tone — deliberately avoiding corporate property-management jargon ("synergistic living experience," etc.). This tone should be preserved if the copy is edited or localized later. Section headings are short and benefit-led rather than feature-led ("Instant Support, Anytime" rather than "AI Chatbot Module").
+14.8 New Tenant-Facing Pages
+`/amenities` — Amenity Booking
+	•	Grid of the tenant's property amenities (image, name, description, "Book Now" if requiresBooking).
+	•	Clicking "Book Now" opens a date picker + time-slot grid (from GET /api/amenities/:id/availability); unavailable slots are visibly disabled, not hidden, so tenants understand demand.
+	•	Confirmation step shows date/time/party size before final submit; on success, shows a confirmation toast and adds the booking to "My Bookings."
+`/amenities/my-bookings` — Tenant's Bookings
+	•	Upcoming and past bookings, with a "Cancel" action on upcoming ones (with confirmation modal).
+`/announcements` — Announcements Feed
+	•	Reverse-chronological list, urgent and important items visually distinguished (e.g. colored left border / badge), expired announcements automatically excluded.
+`/documents` — Document Center
+	•	Two sections: "Property Documents" (policies, notices — visible to all tenants of the property) and "My Documents" (lease and anything addressed specifically to the tenant).
+	•	Each row: title, category badge, upload date, "View/Download" link.
+`/directory` — Resident Directory
+	•	List of opted-in residents of the tenant's own property only (never cross-property).
+	•	Each card: display name, unit number (if the resident chose to show it), bio, email only if contactEmailVisible.
+	•	Empty state if no one has opted in yet: encourages the tenant to be the first ("Be the first to introduce yourself!").
+`/profile` — Tenant Profile & Directory Settings
+	•	Edit display name, bio, and the two directory toggles (showInDirectory, contactEmailVisible) — both default OFF and must be explicitly turned on by the tenant (Section 14.4).
+
+14.9 New/Updated Admin Dashboard Pages
+`/admin/properties` — Property Management (CMS)
+	•	Table of all properties; "Add Property" form (name, slug, address, description, hero image upload).
+	•	Click into a property to manage its Units (add/edit unit numbers, bedroom count, occupancy) in a nested tab.
+`/admin/amenities` — Amenity Management (CMS)
+	•	Per-property amenity list; create/edit form (name, description, image, capacity, booking slot length, open/close hours, requiresBooking toggle).
+	•	A secondary "Bookings" tab shows all bookings for that amenity, filterable by date, with the ability to cancel a booking on a tenant's behalf (e.g. for maintenance closures).
+`/admin/announcements` — Announcements (CMS)
+	•	Create/edit form: title, body (rich text or markdown), priority, property selector, optional expiry date.
+	•	"Draft with AI" button per Section 14.6.
+	•	List view shows publish status (scheduled/live/expired) at a glance.
+`/admin/documents` — Document Center (CMS)
+	•	Upload form: file, title, category, property (or "all properties"), optional specific tenant (defaults to property-wide).
+	•	List view filterable by property/category, with delete capability.
+`/admin/directory` — Directory Moderation
+	•	Read-only view of all directory entries (including opted-out, for support/troubleshooting only) — clearly labeled as an internal moderation view, never exposed to tenants.
+Updates to Existing Admin Pages
+	•	/admin/work-orders and /admin/conversations gain a Property filter dropdown (Section 14.3 denormalization makes this a simple indexed query).
+	•	/admin (Overview) gains a property selector/switcher at the top, since admins overseeing multiple properties need to scope the dashboard view.
+	•	/admin/whitelist gains a Property column/selector when adding a tenant email (admin entries may remain property-unscoped).
+
+14.10 File Storage for Uploads (Documents, Property/Amenity Images)
+For v1, uploaded files (property hero images, amenity images, lease documents) are stored on the VPS's local filesystem under a dedicated /uploads directory, served statically via the Nginx reverse proxy with appropriate access control for tenant-specific documents (a signed, time-limited URL pattern — not a publicly guessable path). This avoids adding a third-party object storage dependency for v1, while keeping the storage layer abstracted behind a single lib/storage/ module so it can be swapped for S3-compatible storage later without touching calling code.
+
+14.11 Updated Build Sequencing
+The build order in Section 13 remains the foundation. Multi-property and portal modules are sequenced after the core chatbot/work-order/admin loop is functional, since that core loop is the highest-priority deliverable and the new modules depend on properties/units existing first:
+1–13. (As specified in Section 13 — core chatbot, auth, work orders, base admin tooling)
+	•	Properties & Units schema + admin CMS (Section 14.2, 14.9)
+	•	Retrofit users, allowed_emails, work_orders, conversations with property/unit references (Section 14.3) — includes a data migration step for any records created before this point
+	•	Real landing page + property pages with full copy (Section 14.7)
+	•	Amenities + booking engine, including the availability/race-condition logic (Section 14.5)
+	•	Announcements module + admin CMS
+	•	Document center + file storage module (Section 14.10)
+	•	Resident directory + tenant profile/privacy settings (Section 14.4, 14.8)
+	•	Property-scoping retrofit of admin dashboards (filters, switcher) (Section 14.9)
+	•	Full QA pass across property-scoping (verify no cross-property data leakage — this is the single highest-risk area of the whole expansion and deserves dedicated test cases)
+	•	CI/CD, deployment, documentation handover (as in Section 13, repeated for the full expanded scope)
+14.12 Key Risk to Flag
+The single biggest technical risk introduced by this expansion is cross-property data leakage — e.g., a tenant at Property A seeing Property B's announcements, directory, or another tenant's documents because a query filter was missed. Every new tenant-facing query must filter by session.propertyId server-side (never trust a client-supplied property ID), and this should be a named item in QA sign-off, not an assumed side effect of "it looked right in testing."
