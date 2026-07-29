@@ -227,7 +227,7 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
       <section className="bg-[#0F1F5C] py-12 px-6 sm:px-10 md:px-14 shadow-inner">
         <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
           {STATS.map((stat, i) => (
-            <div key={i} className="text-center p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
+            <div key={i} className="text-center p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
               <div className="font-serif text-3xl sm:text-4xl text-white font-normal">{stat.value}</div>
               <div className="mt-2 text-xs text-white/60 leading-snug font-normal">{stat.label}</div>
             </div>
@@ -498,7 +498,7 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
                 role: "Evercrest Tenant · Dallas, TX",
               },
             ].map((t, i) => (
-              <div key={i} className="p-7 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xs shadow-lg">
+              <div key={i} className="p-7 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm shadow-lg">
                 <p className="text-[14px] text-white/70 leading-relaxed font-normal mb-6">
                   &ldquo;{t.quote}&rdquo;
                 </p>
