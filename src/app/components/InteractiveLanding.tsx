@@ -116,7 +116,7 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
         {/* CTA */}
         <Link
           href="/login"
-          className="px-5 py-2.5 bg-[#1A6BFF] text-white text-sm font-medium rounded-lg hover:bg-[#1557E8] transition-colors duration-200 shadow-sm whitespace-nowrap"
+          className="px-5 py-2.5 neu-btn-blue text-white text-sm font-medium rounded-xl whitespace-nowrap"
         >
           Magic Link
         </Link>
@@ -132,8 +132,8 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
         {/* Hero Text — top-center */}
         <div className="relative z-10 flex flex-col items-center text-center pt-20 sm:pt-24 md:pt-28 lg:pt-32 px-4 sm:px-6 w-full">
           {/* Eyebrow pill */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 mb-6 rounded-full bg-white/80 backdrop-blur-sm border border-gray-200 text-[11px] uppercase tracking-[0.18em] text-[#191919]/60 font-medium shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-full neu-pill text-[11px] uppercase tracking-[0.18em] text-[#191919]/70 font-medium">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             Evercrest AI · Now Live
           </div>
 
@@ -149,16 +149,16 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
           </p>
 
           {/* CTAs */}
-          <div className="mt-7 sm:mt-8 flex flex-col sm:flex-row items-center gap-3">
+          <div className="mt-7 sm:mt-8 flex flex-col sm:flex-row items-center gap-4">
             <Link
               href="/login"
-              className="px-7 py-3 bg-[#1A6BFF] text-white text-sm font-medium rounded-lg hover:bg-[#1557E8] transition-colors duration-200 shadow-sm"
+              className="px-7 py-3 neu-btn-blue text-white text-sm font-medium rounded-xl"
             >
               Get Started
             </Link>
             <Link
               href="/chat"
-              className="px-7 py-3 bg-white/80 backdrop-blur-sm text-[#191919] text-sm font-medium rounded-lg border border-gray-200 hover:bg-white transition-colors duration-200 shadow-sm inline-flex items-center gap-2"
+              className="px-7 py-3 neu-btn-light text-[#191919] text-sm font-medium rounded-xl inline-flex items-center gap-2"
             >
               Try the AI
               <ArrowRight className="w-3.5 h-3.5 text-[#1A6BFF]" />
@@ -170,7 +170,7 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
             Bottom Info Panel — anchored to bottom of first viewport
         ───────────────────────────────────────────────────────── */}
         <div className="mt-auto relative z-10 w-full max-w-6xl px-4 sm:px-6 mx-auto">
-          <div className="bg-white/92 backdrop-blur-md border border-gray-200 border-b-0 pt-8 sm:pt-10 px-5 sm:px-8 md:px-12 pb-0 shadow-[0_-2px_24px_rgba(0,0,0,0.05)]">
+          <div className="bg-white/95 backdrop-blur-md rounded-t-2xl neu-card pt-8 sm:pt-10 px-5 sm:px-8 md:px-12 pb-0">
             {/* Row 1 */}
             <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-end">
               <div>
@@ -194,10 +194,10 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
             </div>
 
             {/* Hairline */}
-            <div className="mt-7 sm:mt-9 h-px bg-gray-200 w-full" />
+            <div className="mt-7 sm:mt-9 h-px bg-gray-200/60 w-full" />
 
             {/* Row 2 — 3 feature pills */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 py-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 py-5">
               {[
                 { num: "01", label: "Report It", desc: "Describe any home issue in plain language" },
                 { num: "02", label: "Track It", desc: "Work order created & status updated live" },
@@ -206,14 +206,14 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
                 <button
                   key={idx}
                   onClick={() => setActiveTab(activeTab === idx ? null : idx)}
-                  className="group bg-[#F4F3F3] hover:bg-[#eaeaea] transition-all duration-200 cursor-pointer px-5 py-3.5 flex items-center justify-between rounded-md text-left"
+                  className="group neu-pill neu-card-hover cursor-pointer px-5 py-3.5 flex items-center justify-between rounded-xl text-left"
                 >
                   <div className="flex items-center text-sm">
                     <span className="text-[#191919]/35 tabular-nums">{item.num}</span>
                     <span className="mx-2 text-[#191919]/25">/</span>
                     <span className="font-medium text-[#191919]">{item.label}</span>
                   </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-700 group-hover:translate-x-0.5 transition-all duration-200 shrink-0" />
+                  <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#1A6BFF] group-hover:translate-x-0.5 transition-all duration-200 shrink-0" />
                 </button>
               ))}
             </div>
@@ -224,12 +224,12 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
       {/* ═══════════════════════════════════════════════════════════════
           STATS BAR
       ═══════════════════════════════════════════════════════════════ */}
-      <section className="bg-[#0F1F5C] py-10 px-6 sm:px-10 md:px-14">
+      <section className="bg-[#0F1F5C] py-12 px-6 sm:px-10 md:px-14 shadow-inner">
         <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
           {STATS.map((stat, i) => (
-            <div key={i} className="text-center">
+            <div key={i} className="text-center p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
               <div className="font-serif text-3xl sm:text-4xl text-white font-normal">{stat.value}</div>
-              <div className="mt-2 text-xs text-white/50 leading-snug font-normal">{stat.label}</div>
+              <div className="mt-2 text-xs text-white/60 leading-snug font-normal">{stat.label}</div>
             </div>
           ))}
         </div>
@@ -238,7 +238,7 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
       {/* ═══════════════════════════════════════════════════════════════
           CAPABILITIES GRID
       ═══════════════════════════════════════════════════════════════ */}
-      <section id="capabilities" className="py-24 px-6 sm:px-10 md:px-14 bg-white">
+      <section id="capabilities" className="py-24 px-6 sm:px-10 md:px-14 bg-slate-50/50">
         <div className="max-w-6xl mx-auto">
           {/* Section header */}
           <div className="grid md:grid-cols-2 gap-8 items-end mb-16">
@@ -261,16 +261,16 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
           </div>
 
           {/* 3×2 cards */}
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-5">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
             {CAPABILITIES.map((cap, i) => {
               const Icon = cap.icon;
               return (
                 <div
                   key={i}
-                  className="group p-7 rounded-xl bg-[#F4F3F3] border border-transparent hover:border-gray-200 hover:bg-white hover:shadow-sm transition-all duration-300"
+                  className="group p-7 rounded-2xl neu-card neu-card-hover"
                 >
-                  <div className="w-9 h-9 rounded-lg bg-[#191919]/8 flex items-center justify-center mb-5 group-hover:bg-[#191919]/10 transition-colors">
-                    <Icon className="w-4.5 h-4.5 text-[#191919]" size={18} />
+                  <div className="w-10 h-10 rounded-xl neu-inset flex items-center justify-center mb-5 group-hover:scale-105 transition-transform">
+                    <Icon className="w-5 h-5 text-[#1A6BFF]" size={20} />
                   </div>
                   <h3 className="text-base font-serif font-normal text-[#191919] mb-2.5 leading-snug">
                     {cap.title}
@@ -288,7 +288,7 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
       {/* ═══════════════════════════════════════════════════════════════
           HOW IT WORKS — Interactive Step Walkthrough
       ═══════════════════════════════════════════════════════════════ */}
-      <section id="how-it-works" className="py-24 px-6 sm:px-10 md:px-14 bg-[#F4F3F3]">
+      <section id="how-it-works" className="py-24 px-6 sm:px-10 md:px-14 bg-slate-100/60">
         <div className="max-w-6xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <span className="text-[11px] uppercase tracking-[0.2em] text-[#191919]/45 font-medium">
@@ -301,21 +301,21 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
 
           <div className="grid md:grid-cols-2 gap-10 items-start">
             {/* Step list */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               {HOW_IT_WORKS.map((step, i) => (
                 <button
                   key={i}
                   onClick={() => setActiveStep(i)}
-                  className={`w-full text-left px-6 py-5 rounded-xl border transition-all duration-200 ${
+                  className={`w-full text-left px-6 py-5 rounded-2xl transition-all duration-300 ${
                     activeStep === i
-                      ? "bg-white border-gray-200 shadow-sm"
-                      : "bg-transparent border-transparent hover:border-gray-200 hover:bg-white/50"
+                      ? "neu-card scale-[1.01]"
+                      : "neu-pill hover:opacity-90"
                   }`}
                 >
                   <div className="flex items-start gap-4">
                     <span
                       className={`text-[11px] font-medium tabular-nums pt-0.5 transition-colors ${
-                        activeStep === i ? "text-[#191919]" : "text-[#191919]/35"
+                        activeStep === i ? "text-[#1A6BFF]" : "text-[#191919]/35"
                       }`}
                     >
                       {step.step}
@@ -340,47 +340,47 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
             </div>
 
             {/* Visual panel */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="neu-card rounded-2xl overflow-hidden p-2">
               {/* Simulated chat UI */}
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2.5">
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs text-[#191919]/50 font-medium tracking-wide uppercase">Evercrest AI · Live</span>
+              <div className="px-5 py-4 border-b border-gray-200/60 flex items-center gap-2.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs text-[#191919]/60 font-medium tracking-wide uppercase">Evercrest AI · Live</span>
               </div>
-              <div className="p-5 space-y-3 min-h-[260px]">
+              <div className="p-5 space-y-4 min-h-[260px]">
                 {activeStep >= 0 && (
                   <div className="flex gap-3">
-                    <div className="w-7 h-7 rounded-full bg-[#F4F3F3] flex items-center justify-center shrink-0 text-[10px] font-medium text-[#191919]/60">R</div>
-                    <div className="bg-[#F4F3F3] rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[75%]">
+                    <div className="w-8 h-8 rounded-full neu-inset flex items-center justify-center shrink-0 text-xs font-semibold text-[#191919]/70">R</div>
+                    <div className="neu-inset rounded-2xl rounded-tl-sm px-4 py-3 max-w-[75%]">
                       <p className="text-[13px] text-[#191919]">My AC isn&rsquo;t working and it&rsquo;s 95°F inside — 4212 Maple Creek, Unit 7</p>
                     </div>
                   </div>
                 )}
                 {activeStep >= 1 && (
                   <div className="flex gap-3 justify-end">
-                    <div className="bg-[#1A6BFF] rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[75%]">
-                      <p className="text-[13px] text-white">Got it — I&rsquo;ve confirmed your address at 4212 Maple Creek, Unit 7 and logged this as a high-priority HVAC issue. Creating your work order now.</p>
+                    <div className="bg-[#1A6BFF] text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[75%] shadow-md">
+                      <p className="text-[13px]">Got it — I&rsquo;ve confirmed your address at 4212 Maple Creek, Unit 7 and logged this as a high-priority HVAC issue. Creating your work order now.</p>
                     </div>
-                    <div className="w-7 h-7 rounded-full bg-[#1A6BFF] flex items-center justify-center shrink-0">
-                      <svg viewBox="0 0 256 256" fill="white" className="w-3.5 h-3.5"><path d="M 144 256 L 27.598 256 L 144 139.598 Z" /><path d="M 256 207.5 L 200 256 L 200 56 L 0 56 L 48 0 L 256 0 Z" /><path d="M 0 204.402 L 0 112 L 92.402 112 Z" /></svg>
+                    <div className="w-8 h-8 rounded-full neu-btn-blue flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 256 256" fill="white" className="w-4 h-4"><path d="M 144 256 L 27.598 256 L 144 139.598 Z" /><path d="M 256 207.5 L 200 256 L 200 56 L 0 56 L 48 0 L 256 0 Z" /><path d="M 0 204.402 L 0 112 L 92.402 112 Z" /></svg>
                     </div>
                   </div>
                 )}
                 {activeStep >= 2 && (
                   <div className="flex gap-3 justify-end">
-                    <div className="bg-[#1A6BFF] rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[80%]">
-                      <p className="text-[13px] text-white">Work order #WO-2847 has been created and sent to the Evercrest team. You&rsquo;ll receive an update once a technician is assigned.</p>
+                    <div className="bg-[#1A6BFF] text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[80%] shadow-md">
+                      <p className="text-[13px]">Work order #WO-2847 has been created and sent to the Evercrest team. You&rsquo;ll receive an update once a technician is assigned.</p>
                     </div>
-                    <div className="w-7 h-7 rounded-full bg-[#1A6BFF] flex items-center justify-center shrink-0">
-                      <svg viewBox="0 0 256 256" fill="white" className="w-3.5 h-3.5"><path d="M 144 256 L 27.598 256 L 144 139.598 Z" /><path d="M 256 207.5 L 200 256 L 200 56 L 0 56 L 48 0 L 256 0 Z" /><path d="M 0 204.402 L 0 112 L 92.402 112 Z" /></svg>
+                    <div className="w-8 h-8 rounded-full neu-btn-blue flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 256 256" fill="white" className="w-4 h-4"><path d="M 144 256 L 27.598 256 L 144 139.598 Z" /><path d="M 256 207.5 L 200 256 L 200 56 L 0 56 L 48 0 L 256 0 Z" /><path d="M 0 204.402 L 0 112 L 92.402 112 Z" /></svg>
                     </div>
                   </div>
                 )}
                 {activeStep >= 3 && (
-                  <div className="mt-3 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-100 flex items-start gap-2.5">
-                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <div className="mt-3 px-4 py-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80 flex items-start gap-3 shadow-xs">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-[12px] font-medium text-emerald-800">Work order logged & team notified</p>
-                      <p className="text-[11px] text-emerald-600 mt-0.5">The Evercrest admin team can see this issue right now in the dashboard — with your details, urgency level, and full conversation history.</p>
+                      <p className="text-[12px] font-medium text-emerald-900">Work order logged & team notified</p>
+                      <p className="text-[11px] text-emerald-700 mt-0.5">The Evercrest admin team can see this issue right now in the dashboard — with your details, urgency level, and full conversation history.</p>
                     </div>
                   </div>
                 )}
@@ -414,14 +414,14 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
           </div>
 
           {properties.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {properties.map((prop) => (
                 <Link
                   key={prop.id}
                   href={`/properties/${prop.slug}`}
-                  className="group bg-white rounded-xl overflow-hidden border border-gray-200 shadow-xs hover:shadow-md hover:border-gray-300 transition-all duration-300 flex flex-col"
+                  className="group neu-card neu-card-hover rounded-2xl overflow-hidden flex flex-col"
                 >
-                  <div className="aspect-[4/3] bg-[#F4F3F3] relative overflow-hidden">
+                  <div className="aspect-[4/3] neu-inset relative overflow-hidden">
                     {prop.heroImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -430,17 +430,17 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-300 font-serif text-lg">
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 font-serif text-xl">
                         {prop.name[0]}
                       </div>
                     )}
                   </div>
-                  <div className="p-5 flex-1 flex flex-col justify-between">
+                  <div className="p-6 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="text-base font-serif font-normal text-[#191919] group-hover:text-[#191919]/75 transition-colors leading-snug">
+                      <h3 className="text-base font-serif font-normal text-[#191919] group-hover:text-[#1A6BFF] transition-colors leading-snug">
                         {prop.name}
                       </h3>
-                      <p className="text-[11px] text-gray-400 mt-0.5 uppercase tracking-wide">
+                      <p className="text-[11px] text-gray-400 mt-0.5 uppercase tracking-wide font-medium">
                         {prop.city}, {prop.state}
                       </p>
                       {prop.description && (
@@ -449,16 +449,16 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
                         </p>
                       )}
                     </div>
-                    <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-[13px] font-medium text-[#191919]">
+                    <div className="mt-5 pt-4 border-t border-gray-200/60 flex items-center justify-between text-[13px] font-medium text-[#191919]">
                       <span>View Details</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:translate-x-0.5 group-hover:text-[#191919] transition-all" />
+                      <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:translate-x-0.5 group-hover:text-[#1A6BFF] transition-all" />
                     </div>
                   </div>
                 </Link>
               ))}
             </div>
           ) : (
-            <div className="text-center py-16 bg-[#F4F3F3] rounded-2xl border border-gray-200">
+            <div className="text-center py-16 neu-card rounded-2xl">
               <div className="font-serif text-xl text-[#191919]/40 mb-2">No active properties</div>
               <p className="text-sm text-[#191919]/35">Properties will appear here once they&rsquo;re added through the admin dashboard.</p>
             </div>
@@ -480,7 +480,7 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-5">
+          <div className="grid md:grid-cols-3 gap-6">
             {[
               {
                 quote: "My kitchen faucet was leaking at 11 PM. I typed it in, and within a minute I had a confirmation that a work order was created. Someone came the next morning. That never happened before.",
@@ -498,7 +498,7 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
                 role: "Evercrest Tenant · Dallas, TX",
               },
             ].map((t, i) => (
-              <div key={i} className="p-7 rounded-xl border border-white/10 bg-white/5">
+              <div key={i} className="p-7 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xs shadow-lg">
                 <p className="text-[14px] text-white/70 leading-relaxed font-normal mb-6">
                   &ldquo;{t.quote}&rdquo;
                 </p>
@@ -515,7 +515,7 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
       {/* ═══════════════════════════════════════════════════════════════
           CTA — Final Full-Width Call to Action
       ═══════════════════════════════════════════════════════════════ */}
-      <section className="py-28 px-6 sm:px-10 md:px-14 bg-white border-t border-gray-100">
+      <section className="py-28 px-6 sm:px-10 md:px-14 bg-slate-50/60 border-t border-gray-100">
         <div className="max-w-3xl mx-auto text-center">
           <span className="text-[11px] uppercase tracking-[0.2em] text-[#191919]/40 font-medium">
             FOR EVERCREST TENANTS
@@ -527,17 +527,17 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
             Sign in to your Evercrest account and tell our AI what&rsquo;s wrong.
             Your work order reaches the team in seconds — no calls, no waiting, no chasing.
           </p>
-          <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/login"
-              className="px-8 py-3.5 bg-[#1A6BFF] text-white text-sm font-medium rounded-lg hover:bg-[#1557E8] transition-colors shadow-sm inline-flex items-center gap-2"
+              className="px-8 py-3.5 neu-btn-blue text-white text-sm font-medium rounded-xl inline-flex items-center gap-2"
             >
               Sign In with Magic Link
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
             <Link
               href="/chat"
-              className="px-8 py-3.5 border border-gray-200 bg-[#F4F3F3] text-[#191919] text-sm font-medium rounded-lg hover:bg-[#eaeaea] transition-colors inline-flex items-center gap-2"
+              className="px-8 py-3.5 neu-btn-light text-[#191919] text-sm font-medium rounded-xl inline-flex items-center gap-2"
             >
               Report an Issue Now
             </Link>
