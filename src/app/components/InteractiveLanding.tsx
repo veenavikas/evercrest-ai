@@ -44,11 +44,6 @@ const CAPABILITIES = [
     text: "The Evercrest team sees every reported issue in real time — status, priority, assigned technician, and full conversation history, all in one place.",
   },
   {
-    icon: Clock,
-    title: "Instant Status Updates",
-    text: "Tenants get automatic confirmations when their issue is received, when a technician is assigned, and when the job is marked complete.",
-  },
-  {
     icon: Users,
     title: "Property-Wide Announcements",
     text: "Evercrest staff can push notices — maintenance windows, lease reminders, community updates — directly to tenants at a specific home or across all properties.",
@@ -69,7 +64,7 @@ const HOW_IT_WORKS = [
   {
     step: "03",
     title: "Work order raised instantly",
-    body: "A structured work order — with issue type, urgency level, and your details — is created and sent directly to the Evercrest admin team, usually in under 10 seconds.",
+    body: "A structured work order — with issue type, urgency level, and your details — is created and sent directly to the Evercrest admin team, usually in under 30 seconds.",
   },
   {
     step: "04",
@@ -79,7 +74,7 @@ const HOW_IT_WORKS = [
 ];
 
 const STATS = [
-  { value: "< 10s", label: "Average time to create a work order" },
+  { value: "< 30s", label: "Average time to create a work order" },
   { value: "24/7", label: "Available — no office hours needed" },
   { value: "0", label: "Phone calls required to report an issue" },
   { value: "100%", label: "Of issues logged with full audit trail" },
@@ -148,20 +143,14 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
             — our AI creates a work order for the team instantly, any time of day.
           </p>
 
-          {/* CTAs */}
-          <div className="mt-7 sm:mt-8 flex flex-col sm:flex-row items-center gap-4">
+          {/* Single Primary CTA */}
+          <div className="mt-7 sm:mt-8 flex justify-center">
             <Link
               href="/login"
-              className="px-7 py-3 neu-btn-blue text-white text-sm font-medium rounded-xl"
+              className="px-8 py-3.5 neu-btn-blue text-white text-sm font-medium rounded-xl inline-flex items-center gap-2"
             >
-              Get Started
-            </Link>
-            <Link
-              href="/chat"
-              className="px-7 py-3 neu-btn-light text-[#191919] text-sm font-medium rounded-xl inline-flex items-center gap-2"
-            >
-              Try the AI
-              <ArrowRight className="w-3.5 h-3.5 text-[#1A6BFF]" />
+              Report an Issue
+              <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
@@ -527,19 +516,13 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
             Sign in to your Evercrest account and tell our AI what&rsquo;s wrong.
             Your work order reaches the team in seconds — no calls, no waiting, no chasing.
           </p>
-          <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="mt-9 flex justify-center">
             <Link
               href="/login"
               className="px-8 py-3.5 neu-btn-blue text-white text-sm font-medium rounded-xl inline-flex items-center gap-2"
             >
-              Sign In with Magic Link
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-            <Link
-              href="/chat"
-              className="px-8 py-3.5 neu-btn-light text-[#191919] text-sm font-medium rounded-xl inline-flex items-center gap-2"
-            >
               Report an Issue Now
+              <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
