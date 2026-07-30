@@ -104,7 +104,7 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
             <path d="M 0 204.402 L 0 112 L 92.402 112 Z" />
           </svg>
           <span className="font-semibold text-sm tracking-tight text-[#191919] whitespace-nowrap">
-            Evercrest AI
+            CrestFix
           </span>
         </Link>
 
@@ -129,12 +129,12 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
           {/* Eyebrow pill */}
           <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-full neu-pill text-[11px] uppercase tracking-[0.18em] text-[#191919]/70 font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Evercrest AI · Now Live
+            CrestFix · Now Live
           </div>
 
           {/* H1 */}
           <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.05] tracking-tighter text-[#191919] font-normal whitespace-nowrap">
-            Meet Evercrest AI.
+            Meet CrestFix.
           </h1>
 
           {/* Subcopy */}
@@ -333,7 +333,7 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
               {/* Simulated chat UI */}
               <div className="px-5 py-4 border-b border-gray-200/60 flex items-center gap-2.5">
                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-xs text-[#191919]/60 font-medium tracking-wide uppercase">Evercrest AI · Live</span>
+                <span className="text-xs text-[#191919]/60 font-medium tracking-wide uppercase">CrestFix · Live</span>
               </div>
               <div className="p-5 space-y-4 min-h-[260px]">
                 {activeStep >= 0 && (
@@ -538,7 +538,7 @@ export default function InteractiveLanding({ properties }: InteractiveLandingPro
               <path d="M 256 207.5 L 200 256 L 200 56 L 0 56 L 48 0 L 256 0 Z" />
               <path d="M 0 204.402 L 0 112 L 92.402 112 Z" />
             </svg>
-            <span className="font-semibold text-sm text-[#191919] whitespace-nowrap">Evercrest AI</span>
+            <span className="font-semibold text-sm text-[#191919] whitespace-nowrap">CrestFix</span>
           </div>
 
           {/* Links */}

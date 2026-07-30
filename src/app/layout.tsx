@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Evercrest | Meet Evercrest AI",
+  title: "CrestFix | Meet CrestFix",
   description: "Conversational AI platform for modern property management — agents that handle the full tenant lifecycle across maintenance, bookings, and resident support.",
 };
 
