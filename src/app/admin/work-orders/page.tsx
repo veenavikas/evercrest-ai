@@ -4,14 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import { ClipboardList, Inbox, RefreshCw, Search, ShieldAlert, Sparkles, Wrench } from "lucide-react";
 import AdminReport, { SystemActivity } from "../components/AdminReport";
 import TokenUsageReport from "../components/TokenUsageReport";
+import { BENCHMARK_CONVERSATIONS } from "@/lib/workorder-ai/benchmarkData";
 import type { ConversationRecord, ConversationStatus, SystemLogEntry } from "@/lib/workorder-ai/types";
 
 export default function WorkOrdersPage() {
-  const [conversations, setConversations] = useState<ConversationRecord[]>([]);
+  const [conversations, setConversations] = useState<ConversationRecord[]>(BENCHMARK_CONVERSATIONS);
   const [logs, setLogs] = useState<SystemLogEntry[]>([]);
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState("conv-1");
+  const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"single" | "token_report">("single");
 
   const loadAdminData = async () => {
@@ -25,10 +26,10 @@ export default function WorkOrdersPage() {
       const convList: any[] = convRes.conversations || [];
       const systemLogsList: SystemLogEntry[] = logsRes.logs || [];
 
-      // Map DB conversations to full ConversationRecords
-      const records: ConversationRecord[] = convList.map((conv) => ({
-        id: `conv-${conv.id}`,
-        tenantEmail: conv.tenant?.email || "tenant@evercrest.com",
+      // Map DB conversations
+      const dbRecords: ConversationRecord[] = convList.map((conv) => ({
+        id: `conv-db-${conv.id}`,
+        tenantEmail: conv.tenant?.email || "tenant@crestfix.com",
         tenantName: conv.tenant?.fullName || "Resident",
         propertyAddress: conv.propertyAddress || "2526 Valley Forest, Missouri City, TX 77489",
         propertyId: `prop-${conv.propertyId || 1}`,
@@ -39,7 +40,7 @@ export default function WorkOrdersPage() {
           {
             id: `msg-1-${conv.id}`,
             sender: "tenant",
-            body: `Maintenance report filed for property ${conv.propertyAddress || "Evercrest Residence"}.`,
+            body: `Maintenance report filed for property ${conv.propertyAddress || "CrestFix Residence"}.`,
             createdAt: conv.startedAt || new Date().toISOString(),
           },
         ],
@@ -89,10 +90,12 @@ export default function WorkOrdersPage() {
         },
       }));
 
-      setConversations(records);
+      // Combine benchmark conversation set with DB records
+      const combined = [...BENCHMARK_CONVERSATIONS, ...dbRecords];
+      setConversations(combined);
       setLogs(systemLogsList);
-      if (records.length > 0 && !selectedId) {
-        setSelectedId(records[0].id);
+      if (combined.length > 0 && !selectedId) {
+        setSelectedId(combined[0].id);
       }
     } catch (err) {
       console.error("Failed to load admin work order data:", err);
@@ -129,7 +132,7 @@ export default function WorkOrdersPage() {
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Work Order Reports & AI Intelligence</h1>
-          <p className="text-xs text-gray-500 mt-1">B-EST Triage Engine — Work order reports, differential diagnosis & token usage.</p>
+          <p className="text-xs text-gray-500 mt-1">CrestFix Triage Engine — Work order reports, differential diagnosis & token usage.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -223,7 +226,7 @@ export default function WorkOrdersPage() {
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-600 truncate">{conversation.propertyAddress}</p>
-                    <span className="text-[10px] text-slate-400 font-mono block">
+                    <span className="text-[10px] text-slate-400 font-mono block truncate">
                       {conversation.tenantEmail}
                     </span>
                   </button>
