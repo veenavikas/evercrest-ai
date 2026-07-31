@@ -57,7 +57,7 @@ export default function AdminLoginPage() {
             </div>
           </div>
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight drop-shadow-md">
-            Evercrest Admin Portal
+            CrestFix Admin Portal
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-2 font-medium">
             Restricted access — authenticate with your credentials.

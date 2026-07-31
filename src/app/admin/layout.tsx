@@ -42,7 +42,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-gray-200/80 flex flex-col shadow-xs">
         <div className="p-5 border-b border-gray-200/80">
-          <h1 className="text-xl font-serif font-bold text-gray-900 tracking-tight">Evercrest Admin</h1>
+          <h1 className="text-xl font-serif font-bold text-gray-900 tracking-tight">CrestFix Admin</h1>
         </div>
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
           {navItems.map((item) => {

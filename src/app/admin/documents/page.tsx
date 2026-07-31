@@ -16,7 +16,7 @@ type DocumentItem = {
 const initialDocuments: DocumentItem[] = [
   {
     id: "doc-1",
-    title: "Evercrest Tenant Maintenance & Troubleshooting Intake Rules",
+    title: "CrestFix Tenant Maintenance & Troubleshooting Intake Rules",
     category: "Maintenance Rules",
     fileName: "tenant_maintenance_intake_troubleshooting_compliance_reviewed.xlsx",
     fileSize: "24.5 KB",
@@ -45,7 +45,7 @@ const initialDocuments: DocumentItem[] = [
     id: "doc-4",
     title: "Property Amenities & Community Guidelines",
     category: "Tenant Manuals",
-    fileName: "evercrest_community_guidelines.pdf",
+    fileName: "crestfix_community_guidelines.pdf",
     fileSize: "450 KB",
     updatedAt: "2026-06-10",
     downloadUrl: "#",
