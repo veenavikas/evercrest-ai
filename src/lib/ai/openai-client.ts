@@ -44,3 +44,66 @@ export async function openaiChat(options: ChatOptions) {
     throw error;
   }
 }
+
+export type TokenUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+};
+
+export type CompletionResult<T> = {
+  value: T;
+  tokenUsage: TokenUsage;
+};
+
+function readTokenUsage(usage: OpenAI.Completions.CompletionUsage | undefined): TokenUsage {
+  return {
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: usage?.completion_tokens ?? 0,
+    totalTokens: usage?.total_tokens ?? 0,
+  };
+}
+
+export async function generateJsonCompletion<T>(
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
+): Promise<CompletionResult<T>> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: MODELS.CHAT,
+      messages,
+      response_format: { type: "json_object" },
+      temperature: 0,
+    });
+    const text = response.choices[0]?.message?.content;
+    if (!text) {
+      throw new Error("Empty response from OpenAI");
+    }
+    return {
+      value: JSON.parse(text) as T,
+      tokenUsage: readTokenUsage(response.usage),
+    };
+  } catch (error) {
+    console.error("generateJsonCompletion error:", error);
+    throw error;
+  }
+}
+
+export async function generateTextCompletion(
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
+): Promise<CompletionResult<string>> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: MODELS.CHAT,
+      messages,
+      temperature: 0.2,
+    });
+    return {
+      value: response.choices[0]?.message?.content || "",
+      tokenUsage: readTokenUsage(response.usage),
+    };
+  } catch (error) {
+    console.error("generateTextCompletion error:", error);
+    throw error;
+  }
+}
+

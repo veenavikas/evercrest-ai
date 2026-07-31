@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "purpose": "MVP fixture representing the tenant identity and property data that production authentication will provide.",
+  "default_language": "en",
+  "current_tenant_id": "tenant-p141-miguel",
+  "tenants": [
+    {
+      "tenant_id": "tenant-p141-miguel",
+      "name": "Miguel Gomez Jr.",
+      "email": "m92gomez@gmail.com",
+      "whitelisted": true,
+      "display_label": "Miguel Gomez Jr.",
+      "contact_preferences": {
+        "preferred_method": "phone",
+        "phone": "(346) 283-8757"
+      },
+      "property_ids": ["P141"]
+    },
+    {
+      "tenant_id": "tenant-p141-elizabeth",
+      "name": "Elizabeth Lopez",
+      "email": "Yaya86lopez@gmail.com",
+      "whitelisted": true,
+      "display_label": "Elizabeth Lopez",
+      "contact_preferences": {
+        "preferred_method": "phone",
+        "phone": "(346) 801-8367"
+      },
+      "property_ids": ["P141"]
+    }
+  ],
+  "properties": [
+    {
+      "property_id": "P141",
+      "address": "2526 Valley Forest, Missouri City, TX 77489",
+      "unit": "",
+      "active": true,
+      "notes": "MVP fixture for the P141 household. Replace the current_tenant_id lookup with the production session identity during integration."
+    }
+  ],
+  "schema": {
+    "tenant": {
+      "tenant_id": "string",
+      "name": "string",
+      "email": "string",
+      "whitelisted": true,
+      "display_label": "string",
+      "contact_preferences": {
+        "preferred_method": "email | phone | sms | unknown",
+        "phone": "string"
+      },
+      "property_ids": ["string"]
+    },
+    "property": {
+      "property_id": "string",
+      "address": "string",
+      "unit": "string",
+      "active": true,
+      "notes": "string"
+    }
+  }
+}
