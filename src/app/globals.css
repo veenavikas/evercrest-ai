@@ -1,9 +1,21 @@
 @import "tailwindcss";
 
-
 :root {
   --background: #ffffff;
   --foreground: #191919;
+  --bg: #f6f3ef;
+  --surface: #ffffff;
+  --surface-muted: #f1eee8;
+  --line: #d9d2c6;
+  --ink: #1f2523;
+  --muted: #68716d;
+  --teal: #1f766f;
+  --teal-deep: #14534d;
+  --amber: #b66a12;
+  --red: #b63d35;
+  --green: #3f7c4a;
+  --blue: #356c9d;
+  --shadow: 0 14px 34px rgba(36, 32, 26, 0.08);
 }
 
 @theme inline {
@@ -37,4 +49,130 @@ body {
   background: #191919;
 }
 
+/* B-EST WorkOrder Operational Report & Admin Dashboard Styles */
+.admin-shell {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  min-height: 100vh;
+}
 
+.admin-list-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.admin-detail-panel {
+  min-width: 0;
+  background: #f3f5f2;
+}
+
+.report-header {
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.report-header.severity-emergency {
+  border-top: 4px solid var(--red);
+}
+
+.report-header.severity-urgent,
+.report-header.severity-staff_triage {
+  border-top: 4px solid var(--amber);
+}
+
+.report-header.severity-routine {
+  border-top: 4px solid var(--green);
+}
+
+.admin-report {
+  display: grid;
+  gap: 18px;
+  padding: 24px 28px 40px;
+}
+
+.report-hero-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 0.32fr);
+  gap: 28px;
+  overflow: hidden;
+  border-radius: 14px;
+  padding: 28px;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 85% 10%, rgba(255, 255, 255, 0.16), transparent 28%),
+    linear-gradient(125deg, #103f3b 0%, #1f766f 68%, #2b8d7c 100%);
+  box-shadow: 0 18px 38px rgba(20, 83, 77, 0.18);
+}
+
+.report-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.report-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(300px, 0.75fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.report-main-column,
+.report-side-column {
+  display: grid;
+  gap: 18px;
+}
+
+.report-side-column {
+  position: sticky;
+  top: 108px;
+}
+
+.report-section {
+  border: 1px solid #dfe4df;
+  border-radius: 12px;
+  padding: 20px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(37, 48, 44, 0.045);
+}
+
+.similar-case-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.similar-case-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid #dfe4df;
+  border-radius: 10px;
+  padding: 15px;
+  background: linear-gradient(145deg, #ffffff, #f7faf8);
+}
+
+.report-disclosure {
+  border: 1px solid #dfe4df;
+  border-radius: 12px;
+  padding: 0 18px;
+  background: #ffffff;
+}
+
+.report-disclosure summary {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 16px 0;
+  color: var(--teal-deep);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.report-disclosure[open] summary {
+  border-bottom: 1px solid #e4e7e3;
+}
