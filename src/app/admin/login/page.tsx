@@ -34,51 +34,54 @@ export default function AdminLoginPage() {
         throw new Error(data.error?.message || "Invalid Admin User ID or Password");
       }
 
-      // Redirect to admin dashboard
+      // Redirect directly to admin overview page
       router.push("/admin");
       router.refresh();
     } catch (err: any) {
-      setError(err.message || "Failed to log in. Please verify your credentials.");
+      setError(err.message || "Failed to log in. Please check your credentials.");
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4 py-12">
-      {/* Background Glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-950 to-slate-950 pointer-events-none" />
+    <div className="fixed inset-0 z-50 bg-[#0d1117] text-slate-100 flex flex-col justify-center items-center px-4 py-12 overflow-y-auto selection:bg-blue-500 selection:text-white">
+      {/* Skeuomorphic Background Texture & Depth Ambient Lights */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900/90 via-[#0d1117] to-[#080b10] pointer-events-none" />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-md">
-        {/* Header */}
+        {/* Skeuomorphic Badge Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-lg shadow-blue-500/20 mb-4">
-            <ShieldCheck className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 border border-slate-600/50 shadow-[0_10px_25px_rgba(0,0,0,0.6),_inset_0_1px_1px_rgba(255,255,255,0.2)] mb-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),_0_4px_8px_rgba(0,0,0,0.4)]">
+              <ShieldCheck className="w-6 h-6 text-white drop-shadow-md" />
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight drop-shadow-md">
             Evercrest Admin Portal
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-2">
-            Restricted access — sign in with your User ID and password.
+          <p className="text-xs sm:text-sm text-slate-400 mt-2 font-medium">
+            Restricted access — authenticate with your Admin credentials.
           </p>
         </div>
 
-        {/* Login Form Card */}
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+        {/* Skeuomorphic Tactile Card Container */}
+        <div className="bg-[#161b22] border border-slate-700/60 rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.8),_inset_0_1px_1px_rgba(255,255,255,0.1)] space-y-6">
           {error && (
-            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="p-3.5 rounded-2xl bg-rose-950/40 border border-rose-600/40 text-rose-300 text-xs flex items-center gap-2.5 shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
               <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* User ID / Email Input */}
+            {/* User ID / Email Input with Recessed Skeuomorphic Inset Shadow */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-widest mb-2">
                 User ID / Admin Email
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <User className="w-4 h-4" />
                 </div>
                 <input
@@ -87,18 +90,18 @@ export default function AdminLoginPage() {
                   value={userId}
                   onChange={(e) => setUserId(e.target.value)}
                   placeholder="admin or admin@evercrest.com"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                  className="w-full pl-10 pr-4 py-3.5 bg-[#0d1117] border border-slate-800 rounded-2xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6),_0_1px_1px_rgba(255,255,255,0.05)] transition-all"
                 />
               </div>
             </div>
 
-            {/* Password Input */}
+            {/* Password Input with Recessed Skeuomorphic Inset Shadow */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-widest mb-2">
                 Password
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
@@ -107,28 +110,34 @@ export default function AdminLoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                  className="w-full pl-10 pr-4 py-3.5 bg-[#0d1117] border border-slate-800 rounded-2xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6),_0_1px_1px_rgba(255,255,255,0.05)] transition-all"
                 />
               </div>
             </div>
 
-            {/* Default Credentials Hint Box */}
-            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 space-y-1">
-              <span className="font-semibold text-blue-200 block">Default Admin Credentials:</span>
-              <p>User ID: <code className="text-white font-mono bg-blue-900/40 px-1 py-0.5 rounded">admin</code></p>
-              <p>Password: <code className="text-white font-mono bg-blue-900/40 px-1 py-0.5 rounded">admin123</code></p>
+            {/* Tactile Skeuomorphic Hint Badge */}
+            <div className="p-3.5 rounded-2xl bg-[#0d1117]/80 border border-slate-800 shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)] text-[11px] text-slate-300 space-y-1">
+              <span className="font-semibold text-blue-400 block text-[10px] uppercase tracking-wider">Default Admin Credentials</span>
+              <div className="flex justify-between items-center text-slate-300 pt-0.5">
+                <span>User ID:</span>
+                <code className="text-white font-mono bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700 shadow-xs">admin</code>
+              </div>
+              <div className="flex justify-between items-center text-slate-300">
+                <span>Password:</span>
+                <code className="text-white font-mono bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700 shadow-xs">admin123</code>
+              </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Extruded Skeuomorphic 3D Push Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-sm rounded-xl shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 px-4 bg-gradient-to-b from-blue-500 via-blue-600 to-blue-700 hover:from-blue-400 hover:to-blue-600 active:translate-y-0.5 text-white font-semibold text-sm rounded-2xl shadow-[0_6px_12px_rgba(26,107,255,0.35),_inset_0_1px_1px_rgba(255,255,255,0.4),_0_2px_0_#1d4ed8] flex items-center justify-center gap-2 border border-blue-400/40 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Authenticating...</span>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>Verifying Credentials...</span>
                 </>
               ) : (
                 <>
@@ -141,7 +150,7 @@ export default function AdminLoginPage() {
         </div>
 
         <div className="text-center mt-6">
-          <a href="/" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">
+          <a href="/" className="text-xs text-slate-500 hover:text-slate-300 transition-colors font-medium">
             ← Return to CrestFix Home
           </a>
         </div>
