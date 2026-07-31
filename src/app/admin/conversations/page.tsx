@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { MessageSquare, Sparkles, ArrowLeft, RefreshCw } from "lucide-react";
 import AdminReport from "../components/AdminReport";
 import TokenUsageReport from "../components/TokenUsageReport";
+import { BENCHMARK_CONVERSATIONS } from "@/lib/workorder-ai/benchmarkData";
 import type { ConversationRecord } from "@/lib/workorder-ai/types";
 
 export default function ConversationsPage() {
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [conversations, setConversations] = useState<ConversationRecord[]>(BENCHMARK_CONVERSATIONS);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"list" | "analytics">("list");
   const [selectedRecord, setSelectedRecord] = useState<ConversationRecord | null>(null);
   const [recordLoading, setRecordLoading] = useState(false);
@@ -18,7 +19,65 @@ export default function ConversationsPage() {
     fetch("/api/admin/conversations")
       .then((res) => res.json())
       .then((d) => {
-        if (d.conversations) setConversations(d.conversations);
+        const dbList: any[] = d.conversations || [];
+        const dbRecords: ConversationRecord[] = dbList.map((conv) => ({
+          id: `conv-db-${conv.id}`,
+          tenantEmail: conv.tenant?.email || "tenant@crestfix.com",
+          tenantName: conv.tenant?.fullName || "Resident",
+          propertyAddress: "2526 Valley Forest, Missouri City, TX 77489",
+          propertyId: "P141",
+          status: "ticket_submitted",
+          createdAt: conv.startedAt || new Date().toISOString(),
+          updatedAt: conv.lastMessageAt || new Date().toISOString(),
+          messages: [
+            {
+              id: `msg-${conv.id}`,
+              sender: "tenant",
+              body: `Maintenance report logged for property 2526 Valley Forest.`,
+              createdAt: conv.startedAt || new Date().toISOString(),
+            },
+          ],
+          attachments: [],
+          verdict: {
+            issueCategory: "Maintenance Issue",
+            issueLocation: "General",
+            currentStatus: "Active now",
+            severity: "routine",
+            safetyConcerns: [],
+            missingInfo: [],
+            photoVideoStatus: "optional_if_useful",
+            safeStepsDiscussed: [],
+            staffReviewRequired: true,
+            staffReviewReason: ["Staff review requested"],
+            likelyVendorCategory: "General Handyman",
+            intakeComplete: true,
+            possibleTenantCausedIndicators: [],
+            complianceSensitiveFlags: [],
+            accessDetails: {
+              permissionToEnter: "yes",
+              occupied: "yes",
+              restrictedTimes: "",
+              inaccessibleAreas: "",
+              petsPresent: "unclear",
+              petSecurePlan: "",
+              alarmPresent: "unclear",
+              alarmCodeHandling: "unclear",
+              gateOrEntryNotes: "",
+              parkingOrHoaNotes: "",
+              contactPreference: conv.tenant?.email || "",
+            },
+            differentialAnalysis: [],
+            costEstimation: "$150 - $300",
+            repairpersonAdvice: "Check primary system components.",
+          },
+          tokenUsage: {
+            inputTokens: 1450,
+            outputTokens: 380,
+            totalTokens: 1830,
+          },
+        }));
+
+        setConversations([...BENCHMARK_CONVERSATIONS, ...dbRecords]);
         setLoading(false);
       })
       .catch((err) => {
@@ -32,6 +91,11 @@ export default function ConversationsPage() {
   }, []);
 
   const inspectConversation = (id: string | number) => {
+    const found = conversations.find((c) => c.id === String(id));
+    if (found) {
+      setSelectedRecord(found);
+      return;
+    }
     const numericId = typeof id === "string" ? id.replace(/\D/g, "") || id : id;
     setRecordLoading(true);
     fetch(`/api/admin/conversations/${numericId}`)
@@ -57,56 +121,6 @@ export default function ConversationsPage() {
     }
   };
 
-  const mockRecordsForAnalytics: ConversationRecord[] = conversations.map((conv) => ({
-    id: `conv-${conv.id}`,
-    tenantEmail: conv.tenant?.email || "tenant@evercrest.com",
-    tenantName: conv.tenant?.fullName || "Tenant",
-    propertyAddress: "2526 Valley Forest, Missouri City, TX 77489",
-    propertyId: "P141",
-    status: "ticket_submitted",
-    createdAt: conv.startedAt,
-    updatedAt: conv.lastMessageAt,
-    messages: [],
-    attachments: [],
-    verdict: {
-      issueCategory: "Maintenance Issue",
-      issueLocation: "General",
-      currentStatus: "Active",
-      severity: "routine",
-      safetyConcerns: [],
-      missingInfo: [],
-      photoVideoStatus: "optional_if_useful",
-      safeStepsDiscussed: [],
-      staffReviewRequired: false,
-      staffReviewReason: [],
-      likelyVendorCategory: "General Handyman",
-      intakeComplete: true,
-      possibleTenantCausedIndicators: [],
-      complianceSensitiveFlags: [],
-      accessDetails: {
-        permissionToEnter: "yes",
-        occupied: "yes",
-        restrictedTimes: "",
-        inaccessibleAreas: "",
-        petsPresent: "unclear",
-        petSecurePlan: "",
-        alarmPresent: "unclear",
-        alarmCodeHandling: "unclear",
-        gateOrEntryNotes: "",
-        parkingOrHoaNotes: "",
-        contactPreference: conv.tenant?.email || "",
-      },
-      differentialAnalysis: [],
-      costEstimation: "",
-      repairpersonAdvice: "",
-    },
-    tokenUsage: {
-      inputTokens: 1450,
-      outputTokens: 380,
-      totalTokens: 1830,
-    },
-  }));
-
   if (recordLoading) {
     return (
       <div className="p-12 text-center text-slate-500 flex flex-col items-center justify-center space-y-3">
@@ -123,7 +137,7 @@ export default function ConversationsPage() {
           onClick={() => setSelectedRecord(null)}
           className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white border border-gray-200 px-3.5 py-2 rounded-xl shadow-2xs hover:bg-gray-50 transition-all cursor-pointer"
         >
-          <ArrowLeft size={14} /> Back to Conversations
+          <ArrowLeft size={14} /> Back to Conversations List
         </button>
         <AdminReport conversation={selectedRecord} onStatusChange={handleStatusChange} />
       </div>
@@ -135,7 +149,7 @@ export default function ConversationsPage() {
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Work Order Conversations</h1>
-          <p className="text-xs text-gray-500 mt-1">AI-assisted maintenance triage and tenant conversation audit log.</p>
+          <p className="text-xs text-gray-500 mt-1">CrestFix AI-assisted maintenance triage and tenant conversation audit log.</p>
         </div>
         <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
           <button
@@ -144,7 +158,7 @@ export default function ConversationsPage() {
               activeTab === "list" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            Conversations List
+            Conversations List ({conversations.length})
           </button>
           <button
             onClick={() => setActiveTab("analytics")}
@@ -158,15 +172,15 @@ export default function ConversationsPage() {
       </div>
 
       {activeTab === "analytics" ? (
-        <TokenUsageReport conversations={mockRecordsForAnalytics} onSelectConversation={inspectConversation} />
+        <TokenUsageReport conversations={conversations} onSelectConversation={inspectConversation} />
       ) : (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 border-b border-gray-200 text-slate-600 font-semibold">
               <tr>
-                <th className="px-6 py-3.5">Tenant</th>
-                <th className="px-6 py-3.5">Started</th>
-                <th className="px-6 py-3.5">Last Message</th>
+                <th className="px-6 py-3.5">Tenant & Property</th>
+                <th className="px-6 py-3.5">Category</th>
+                <th className="px-6 py-3.5">Token Consumption</th>
                 <th className="px-6 py-3.5">Status</th>
                 <th className="px-6 py-3.5 text-right">Action</th>
               </tr>
@@ -182,20 +196,35 @@ export default function ConversationsPage() {
                 conversations.map((conv) => (
                   <tr key={conv.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900">{conv.tenant?.fullName || "Evercrest Resident"}</div>
-                      <div className="text-[11px] text-slate-500 font-mono">{conv.tenant?.email}</div>
+                      <div className="font-semibold text-slate-900">{conv.tenantName || "Resident"}</div>
+                      <div className="text-[11px] text-slate-500 font-mono">{conv.tenantEmail}</div>
+                      <div className="text-[10px] text-slate-400">{conv.propertyAddress}</div>
                     </td>
-                    <td className="px-6 py-4 text-slate-500">{new Date(conv.startedAt).toLocaleString()}</td>
-                    <td className="px-6 py-4 text-slate-500">{new Date(conv.lastMessageAt).toLocaleString()}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${conv.isArchived ? "bg-gray-100 text-gray-700" : "bg-emerald-50 text-emerald-700 border border-emerald-200/60"}`}>
-                        {conv.isArchived ? "Archived" : "Active Triage"}
+                      <span className="font-medium text-slate-800">{conv.verdict.issueCategory}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg">
+                        ⚡ {(conv.tokenUsage?.totalTokens || 0).toLocaleString()} tokens
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${
+                          conv.verdict.severity === "emergency"
+                            ? "bg-rose-50 text-rose-700 border border-rose-200"
+                            : conv.verdict.severity === "urgent"
+                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                            : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        }`}
+                      >
+                        {conv.status.replace("_", " ")}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => inspectConversation(conv.id)}
-                        className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg text-xs font-medium hover:bg-blue-100 inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                        className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg text-xs font-medium hover:bg-blue-100 inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
                       >
                         <MessageSquare size={14} /> Inspect Report
                       </button>
