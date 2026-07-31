@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Search, Shield, User, Building, FileSpreadsheet } from "lucide-react";
+import { Plus, Search, Shield, User, Building, FileSpreadsheet, Trash2 } from "lucide-react";
 
 type WhitelistEntry = {
   id: number;
@@ -96,6 +96,25 @@ export default function WhitelistPage() {
     }
   };
 
+  const handleDelete = async (id: number, email: string) => {
+    if (!confirm(`Are you sure you want to remove ${email} from the whitelist?`)) return;
+    try {
+      const res = await fetch("/api/admin/allowed-emails", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, email }),
+      });
+      if (res.ok) {
+        fetchData();
+      } else {
+        const err = await res.json();
+        alert(err.error?.message || "Failed to remove email from whitelist");
+      }
+    } catch (err) {
+      console.error("Failed to delete whitelist entry:", err);
+    }
+  };
+
   if (loading) return <div className="p-8 text-gray-500">Loading access whitelist...</div>;
 
   return (
@@ -103,11 +122,11 @@ export default function WhitelistPage() {
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Access Whitelist</h1>
-          <p className="text-xs text-gray-500 mt-1">Appfolio synced resident directory & admin access whitelist.</p>
+          <p className="text-xs text-gray-500 mt-1">PostgreSQL connected resident directory & admin access whitelist.</p>
         </div>
         <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl text-xs font-semibold text-indigo-700">
           <FileSpreadsheet size={15} />
-          <span>Appfolio Synced ({stats.total} Whitelisted)</span>
+          <span>Database Connected ({stats.total} Whitelisted)</span>
         </div>
       </div>
 
@@ -223,6 +242,7 @@ export default function WhitelistPage() {
                 <th className="px-6 py-3">Role</th>
                 <th className="px-6 py-3">Assigned Property Address</th>
                 <th className="px-6 py-3">Added Date</th>
+                <th className="px-6 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -251,11 +271,20 @@ export default function WhitelistPage() {
                       )}
                     </td>
                     <td className="px-6 py-3.5 text-slate-500">{new Date(entry.createdAt).toLocaleDateString()}</td>
+                    <td className="px-6 py-3.5 text-right">
+                      <button
+                        onClick={() => handleDelete(entry.id, entry.email)}
+                        className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                        title="Remove from Whitelist"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-400 italic">
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-400 italic">
                     No matching whitelist entries found.
                   </td>
                 </tr>

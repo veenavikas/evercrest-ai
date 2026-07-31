@@ -47,7 +47,6 @@ export async function POST(request: Request) {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // Verify if property exists if propertyId is provided
     let validPropertyId: number | null = null;
     if (propertyId && !isNaN(Number(propertyId))) {
       const numPropId = Number(propertyId);
@@ -62,7 +61,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Verify actor user ID in users table
     let actorId: number | null = null;
     if (session.userId) {
       const [userCheck] = await db.select().from(users).where(eq(users.id, session.userId));
@@ -76,7 +74,6 @@ export async function POST(request: Request) {
       addedBy: actorId,
     }).returning();
 
-    // Auto-create matching user in users table if not already present
     const [existingUser] = await db.select().from(users).where(eq(users.email, cleanEmail));
     if (!existingUser) {
       await db.insert(users).values({
@@ -108,5 +105,46 @@ export async function POST(request: Request) {
     }
     console.error("Error adding to whitelist:", error);
     return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Failed to add email to whitelist." } }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== "admin") {
+      return NextResponse.json({ error: { code: "FORBIDDEN", message: "Admin access required" } }, { status: 403 });
+    }
+
+    const { id, email } = await request.json();
+    if (!id && !email) {
+      return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "ID or email is required to delete" } }, { status: 400 });
+    }
+
+    let deletedEmail = email;
+
+    if (id) {
+      const [entry] = await db.select().from(allowedEmails).where(eq(allowedEmails.id, Number(id)));
+      if (entry) {
+        deletedEmail = entry.email;
+        await db.delete(allowedEmails).where(eq(allowedEmails.id, Number(id)));
+      }
+    } else if (email) {
+      const cleanEmail = String(email).trim().toLowerCase();
+      await db.delete(allowedEmails).where(eq(allowedEmails.email, cleanEmail));
+    }
+
+    try {
+      await db.insert(systemLogs).values({
+        eventType: "admin.whitelist_updated",
+        metadata: { action: "deleted", email: deletedEmail },
+      });
+    } catch (logErr) {
+      console.warn("Writing system log skipped:", logErr);
+    }
+
+    return NextResponse.json({ success: true, message: "Email removed from whitelist successfully" });
+  } catch (error) {
+    console.error("Error deleting whitelist entry:", error);
+    return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Failed to delete whitelist entry." } }, { status: 500 });
   }
 }
