@@ -15,29 +15,41 @@ type WhitelistEntry = {
   createdAt: string;
 };
 
+type PropertyOption = {
+  id: number;
+  name: string;
+  addressLine1: string;
+  city: string;
+  state: string;
+};
+
 export default function WhitelistPage() {
   const [entries, setEntries] = useState<WhitelistEntry[]>([]);
+  const [propertiesList, setPropertiesList] = useState<PropertyOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<"tenant" | "admin">("tenant");
   const [newPropertyId, setNewPropertyId] = useState("");
 
-  const fetchWhitelist = () => {
-    fetch("/api/admin/allowed-emails")
-      .then((res) => res.json())
-      .then((d) => {
-        if (d.allowedEmails) setEntries(d.allowedEmails);
+  const fetchData = () => {
+    Promise.all([
+      fetch("/api/admin/allowed-emails").then((res) => res.json()),
+      fetch("/api/admin/properties").then((res) => res.json()),
+    ])
+      .then(([allowedData, propsData]) => {
+        if (allowedData.allowedEmails) setEntries(allowedData.allowedEmails);
+        if (propsData.properties) setPropertiesList(propsData.properties);
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Failed to load whitelist:", err);
+        console.error("Failed to load whitelist or properties:", err);
         setLoading(false);
       });
   };
 
   useEffect(() => {
-    fetchWhitelist();
+    fetchData();
   }, []);
 
   const filteredEntries = useMemo(() => {
@@ -74,7 +86,7 @@ export default function WhitelistPage() {
       if (res.ok) {
         setNewEmail("");
         setNewPropertyId("");
-        fetchWhitelist();
+        fetchData();
       } else {
         const err = await res.json();
         alert(err.error?.message || "Failed to add email to whitelist");
@@ -160,15 +172,20 @@ export default function WhitelistPage() {
               <option value="admin">Admin</option>
             </select>
           </div>
-          <div className="w-40">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Property ID (Opt)</label>
-            <input
-              type="number"
+          <div className="w-64">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Assigned Property</label>
+            <select
               value={newPropertyId}
               onChange={(e) => setNewPropertyId(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
-              placeholder="e.g. 1"
-            />
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
+            >
+              <option value="">No Property / All Properties</option>
+              {propertiesList.map((prop) => (
+                <option key={prop.id} value={prop.id}>
+                  {prop.addressLine1} ({prop.city})
+                </option>
+              ))}
+            </select>
           </div>
           <button
             type="submit"
