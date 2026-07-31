@@ -14,7 +14,7 @@ export default function AdminLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId.trim() || !password) {
-      setError("Please enter your Admin User ID / Email and password.");
+      setError("Please enter your User ID or Email and password.");
       return;
     }
 
@@ -31,26 +31,25 @@ export default function AdminLoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error?.message || "Invalid Admin User ID or Password");
+        throw new Error(data.error?.message || "Invalid credentials");
       }
 
-      // Redirect directly to admin overview page
       router.push("/admin");
       router.refresh();
     } catch (err: any) {
-      setError(err.message || "Failed to log in. Please check your credentials.");
+      setError(err.message || "Failed to log in. Please verify your credentials.");
       setLoading(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-[#0d1117] text-slate-100 flex flex-col justify-center items-center px-4 py-12 overflow-y-auto selection:bg-blue-500 selection:text-white">
-      {/* Skeuomorphic Background Texture & Depth Ambient Lights */}
+      {/* Background Texture & Ambient Lights */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900/90 via-[#0d1117] to-[#080b10] pointer-events-none" />
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-md">
-        {/* Skeuomorphic Badge Header */}
+        {/* Skeuomorphic Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 border border-slate-600/50 shadow-[0_10px_25px_rgba(0,0,0,0.6),_inset_0_1px_1px_rgba(255,255,255,0.2)] mb-4">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),_0_4px_8px_rgba(0,0,0,0.4)]">
@@ -61,7 +60,7 @@ export default function AdminLoginPage() {
             Evercrest Admin Portal
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-2 font-medium">
-            Restricted access — authenticate with your Admin credentials.
+            Restricted access — authenticate with your credentials.
           </p>
         </div>
 
@@ -75,10 +74,10 @@ export default function AdminLoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* User ID / Email Input with Recessed Skeuomorphic Inset Shadow */}
+            {/* User ID / Email Input */}
             <div>
               <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-widest mb-2">
-                User ID / Admin Email
+                User ID / Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -89,13 +88,13 @@ export default function AdminLoginPage() {
                   required
                   value={userId}
                   onChange={(e) => setUserId(e.target.value)}
-                  placeholder="admin or admin@evercrest.com"
+                  placeholder="Enter User ID or Email"
                   className="w-full pl-10 pr-4 py-3.5 bg-[#0d1117] border border-slate-800 rounded-2xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6),_0_1px_1px_rgba(255,255,255,0.05)] transition-all"
                 />
               </div>
             </div>
 
-            {/* Password Input with Recessed Skeuomorphic Inset Shadow */}
+            {/* Password Input */}
             <div>
               <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-widest mb-2">
                 Password
@@ -115,20 +114,7 @@ export default function AdminLoginPage() {
               </div>
             </div>
 
-            {/* Tactile Skeuomorphic Hint Badge */}
-            <div className="p-3.5 rounded-2xl bg-[#0d1117]/80 border border-slate-800 shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)] text-[11px] text-slate-300 space-y-1">
-              <span className="font-semibold text-blue-400 block text-[10px] uppercase tracking-wider">Default Admin Credentials</span>
-              <div className="flex justify-between items-center text-slate-300 pt-0.5">
-                <span>User ID:</span>
-                <code className="text-white font-mono bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700 shadow-xs">admin</code>
-              </div>
-              <div className="flex justify-between items-center text-slate-300">
-                <span>Password:</span>
-                <code className="text-white font-mono bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700 shadow-xs">admin123</code>
-              </div>
-            </div>
-
-            {/* Extruded Skeuomorphic 3D Push Button */}
+            {/* Skeuomorphic 3D Push Button */}
             <button
               type="submit"
               disabled={loading}
@@ -137,11 +123,11 @@ export default function AdminLoginPage() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>Verifying Credentials...</span>
+                  <span>Verifying...</span>
                 </>
               ) : (
                 <>
-                  <span>Sign In to Admin Portal</span>
+                  <span>Sign In</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
