@@ -1,28 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { Plus, Search, Shield, User, Building, FileSpreadsheet } from "lucide-react";
 
 type WhitelistEntry = {
   id: number;
   email: string;
   role: "admin" | "tenant";
   propertyId: number | null;
+  propertyName?: string | null;
+  propertyAddress?: string | null;
+  city?: string | null;
+  state?: string | null;
   createdAt: string;
 };
 
 export default function WhitelistPage() {
   const [entries, setEntries] = useState<WhitelistEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<"tenant" | "admin">("tenant");
   const [newPropertyId, setNewPropertyId] = useState("");
 
   const fetchWhitelist = () => {
     fetch("/api/admin/allowed-emails")
-      .then(res => res.json())
-      .then(d => {
+      .then((res) => res.json())
+      .then((d) => {
         if (d.allowedEmails) setEntries(d.allowedEmails);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load whitelist:", err);
         setLoading(false);
       });
   };
@@ -31,16 +40,35 @@ export default function WhitelistPage() {
     fetchWhitelist();
   }, []);
 
+  const filteredEntries = useMemo(() => {
+    const query = searchTerm.toLowerCase();
+    return entries.filter((entry) => {
+      return (
+        entry.email.toLowerCase().includes(query) ||
+        (entry.propertyAddress || "").toLowerCase().includes(query) ||
+        (entry.city || "").toLowerCase().includes(query) ||
+        entry.role.toLowerCase().includes(query)
+      );
+    });
+  }, [entries, searchTerm]);
+
+  const stats = useMemo(() => {
+    const tenants = entries.filter((e) => e.role === "tenant").length;
+    const admins = entries.filter((e) => e.role === "admin").length;
+    const mappedProperties = new Set(entries.map((e) => e.propertyId).filter(Boolean)).size;
+    return { tenants, admins, mappedProperties, total: entries.length };
+  }, [entries]);
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const res = await fetch("/api/admin/allowed-emails", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          email: newEmail, 
-          role: newRole, 
-          propertyId: newPropertyId ? parseInt(newPropertyId) : null 
+        body: JSON.stringify({
+          email: newEmail,
+          role: newRole,
+          propertyId: newPropertyId ? parseInt(newPropertyId) : null,
         }),
       });
       if (res.ok) {
@@ -49,92 +77,175 @@ export default function WhitelistPage() {
         fetchWhitelist();
       } else {
         const err = await res.json();
-        alert(err.error?.message || "Failed to add email");
+        alert(err.error?.message || "Failed to add email to whitelist");
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  if (loading) return <div className="p-8">Loading...</div>;
+  if (loading) return <div className="p-8 text-gray-500">Loading access whitelist...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Access Whitelist</h1>
+    <div className="space-y-6 text-[#191919]">
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Access Whitelist</h1>
+          <p className="text-xs text-gray-500 mt-1">Appfolio synced resident directory & admin access whitelist.</p>
+        </div>
+        <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl text-xs font-semibold text-indigo-700">
+          <FileSpreadsheet size={15} />
+          <span>Appfolio Synced ({stats.total} Whitelisted)</span>
+        </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <h2 className="text-lg font-semibold mb-4">Add New User</h2>
-        <form onSubmit={handleAdd} className="flex gap-4 items-end">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input 
-              type="email" 
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-1">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+            <User size={16} className="text-blue-500" />
+            <span>Total Whitelisted</span>
+          </div>
+          <div className="text-xl font-bold text-slate-900 mt-1">{stats.total} Users</div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-1">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+            <User size={16} className="text-emerald-500" />
+            <span>Whitelisted Tenants</span>
+          </div>
+          <div className="text-xl font-bold text-slate-900 mt-1">{stats.tenants} Tenants</div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-1">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+            <Building size={16} className="text-indigo-500" />
+            <span>Mapped Properties</span>
+          </div>
+          <div className="text-xl font-bold text-slate-900 mt-1">{stats.mappedProperties} Properties</div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-1">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+            <Shield size={16} className="text-purple-500" />
+            <span>Admin Users</span>
+          </div>
+          <div className="text-xl font-bold text-slate-900 mt-1">{stats.admins} Admins</div>
+        </div>
+      </div>
+
+      {/* Add New Whitelist Entry */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-2xs space-y-4">
+        <h2 className="text-sm font-semibold text-gray-900">Add New Whitelisted User</h2>
+        <form onSubmit={handleAdd} className="flex flex-wrap md:flex-nowrap gap-3 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Email Address</label>
+            <input
+              type="email"
               required
               value={newEmail}
-              onChange={e => setNewEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              placeholder="user@example.com"
+              onChange={(e) => setNewEmail(e.target.value)}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+              placeholder="resident@example.com"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-            <select 
+          <div className="w-32">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Role</label>
+            <select
               value={newRole}
-              onChange={e => setNewRole(e.target.value as any)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              onChange={(e) => setNewRole(e.target.value as any)}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
             >
               <option value="tenant">Tenant</option>
               <option value="admin">Admin</option>
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Property ID (Optional)</label>
-            <input 
-              type="number" 
+          <div className="w-40">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Property ID (Opt)</label>
+            <input
+              type="number"
               value={newPropertyId}
-              onChange={e => setNewPropertyId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              onChange={(e) => setNewPropertyId(e.target.value)}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
               placeholder="e.g. 1"
             />
           </div>
-          <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
-            <Plus size={18} /> Add
+          <button
+            type="submit"
+            className="bg-[#191919] text-white text-xs font-medium px-4 py-2 rounded-xl hover:bg-gray-800 flex items-center gap-1.5 transition-all cursor-pointer h-[34px]"
+          >
+            <Plus size={15} /> Add to Whitelist
           </button>
         </form>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-sm font-medium text-gray-500">Email</th>
-              <th className="px-6 py-3 text-sm font-medium text-gray-500">Role</th>
-              <th className="px-6 py-3 text-sm font-medium text-gray-500">Property ID</th>
-              <th className="px-6 py-3 text-sm font-medium text-gray-500">Added Date</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {entries.map(entry => (
-              <tr key={entry.id}>
-                <td className="px-6 py-4 text-gray-900">{entry.email}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 text-xs rounded-full ${entry.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
-                    {entry.role}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-gray-500">{entry.propertyId || "All"}</td>
-                <td className="px-6 py-4 text-gray-500">{new Date(entry.createdAt).toLocaleDateString()}</td>
-              </tr>
-            ))}
-            {entries.length === 0 && (
+      {/* Whitelist Directory Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
+        <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-wrap gap-4">
+          <div className="flex items-center gap-2">
+            <Shield size={16} className="text-blue-600" />
+            <h3 className="text-sm font-semibold text-slate-900">Whitelisted Directory ({filteredEntries.length})</h3>
+          </div>
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search email or property address..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 pr-3 py-1.5 rounded-xl border border-gray-300 text-xs w-72 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 border-b border-gray-200 text-slate-600 font-semibold">
               <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">No users in whitelist</td>
+                <th className="px-6 py-3">Whitelisted Email</th>
+                <th className="px-6 py-3">Role</th>
+                <th className="px-6 py-3">Assigned Property Address</th>
+                <th className="px-6 py-3">Added Date</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredEntries.length > 0 ? (
+                filteredEntries.map((entry) => (
+                  <tr key={entry.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-6 py-3.5 font-medium text-slate-900">{entry.email}</td>
+                    <td className="px-6 py-3.5">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${
+                          entry.role === "admin"
+                            ? "bg-purple-50 text-purple-700 border border-purple-200"
+                            : "bg-blue-50 text-blue-700 border border-blue-200"
+                        }`}
+                      >
+                        {entry.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3.5 text-slate-600">
+                      {entry.propertyAddress ? (
+                        <span>
+                          {entry.propertyAddress}, {entry.city || ""} {entry.state || ""}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 italic">All properties / General</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3.5 text-slate-500">{new Date(entry.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-gray-400 italic">
+                    No matching whitelist entries found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
