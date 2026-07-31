@@ -233,7 +233,39 @@ export default function AdminReport({ conversation, logs = [], onStatusChange }:
           {conversation.staffEmail?.body ?? "No staff handoff email has been generated yet."}
         </pre>
       </details>
+
+      <SystemActivity logs={reportLogs} />
     </div>
+  );
+}
+
+export function SystemActivity({ logs }: { logs: SystemLogEntry[] }) {
+  return (
+    <details className="p-4 rounded-xl bg-slate-900 text-slate-200 text-xs cursor-pointer mt-4">
+      <summary className="font-medium flex items-center gap-2">
+        <Activity size={16} /> System Activity / {logs.length} event{logs.length === 1 ? "" : "s"}
+      </summary>
+      <div className="mt-3 space-y-2">
+        {logs.length ? (
+          logs.map((entry) => (
+            <article key={entry.id} className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs space-y-1">
+              <div className="flex justify-between items-center text-[10px] text-slate-400">
+                <strong className="text-slate-200">{entry.event}</strong>
+                <span>{new Date(entry.timestamp).toLocaleString()}</span>
+              </div>
+              <p className="text-slate-300">{entry.message}</p>
+              {entry.details ? (
+                <pre className="text-[10px] font-mono text-slate-500 bg-slate-900 p-2 rounded overflow-x-auto">
+                  {JSON.stringify(entry.details, null, 2)}
+                </pre>
+              ) : null}
+            </article>
+          ))
+        ) : (
+          <p className="text-slate-500 italic">No system activity recorded yet.</p>
+        )}
+      </div>
+    </details>
   );
 }
 
