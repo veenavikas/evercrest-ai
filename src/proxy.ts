@@ -67,13 +67,16 @@ export async function proxy(request: NextRequest) {
       }
       return NextResponse.redirect(new URL('/admin/login', request.url));
     }
+
+    // Valid Admin Session: proceed immediately
+    return NextResponse.next();
   }
 
-  // Secure path — refresh session & get user
+  // Tenant / Standard User Path — refresh session & get user
   const { supabaseResponse, supabase } = await updateSession(request);
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user && !pathname.startsWith('/admin')) {
+  if (!user) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
         { error: { code: 'UNAUTHORIZED', message: 'You must be signed in to perform this action.' } },
