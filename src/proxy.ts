@@ -30,6 +30,8 @@ export async function proxy(request: NextRequest) {
   const isPublicPath = 
     pathname === '/' || 
     pathname === '/login' || 
+    pathname === '/admin/login' ||
+    pathname.startsWith('/api/admin/auth') ||
     pathname.startsWith('/properties') ||
     pathname.startsWith('/api/properties') ||
     pathname.startsWith('/api/auth') || 
@@ -37,17 +39,41 @@ export async function proxy(request: NextRequest) {
     pathname.includes('.'); // static files
 
   if (isPublicPath) {
-    // We still call updateSession so Supabase can refresh the cookie if needed
     const { supabaseResponse } = await updateSession(request);
     return supabaseResponse;
   }
 
-  // Secure path - refresh session & get user
+  // Admin Route Protection — verify evercrest_admin_session cookie
+  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
+    const adminCookie = request.cookies.get('evercrest_admin_session');
+    let hasValidAdmin = false;
+    if (adminCookie?.value) {
+      try {
+        const decoded = JSON.parse(Buffer.from(adminCookie.value, 'base64').toString('utf-8'));
+        if (decoded.userId && decoded.role === 'admin') {
+          hasValidAdmin = true;
+        }
+      } catch (e) {
+        hasValidAdmin = false;
+      }
+    }
+
+    if (!hasValidAdmin) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          { error: { code: 'UNAUTHORIZED', message: 'Admin authentication required.' } },
+          { status: 401 }
+        );
+      }
+      return NextResponse.redirect(new URL('/admin/login', request.url));
+    }
+  }
+
+  // Secure path — refresh session & get user
   const { supabaseResponse, supabase } = await updateSession(request);
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    // If not authenticated and trying to access protected route
+  if (!user && !pathname.startsWith('/admin')) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
         { error: { code: 'UNAUTHORIZED', message: 'You must be signed in to perform this action.' } },
@@ -73,12 +99,14 @@ export async function proxy(request: NextRequest) {
   requestHeaders.delete('oai-authenticated-user-email');
   requestHeaders.delete('oai-authenticated-user-full-name');
 
-  // Set trusted headers from session (Supabase)
-  requestHeaders.set('x-user-email', user.email!); // Kept for backwards compatibility with our API
-  requestHeaders.set('oai-authenticated-user-email', user.email!);
-  
-  if (user.user_metadata?.full_name) {
-    requestHeaders.set('oai-authenticated-user-full-name', user.user_metadata.full_name);
+  // Set trusted headers from session (Supabase) if tenant user is logged in
+  if (user?.email) {
+    requestHeaders.set('x-user-email', user.email);
+    requestHeaders.set('oai-authenticated-user-email', user.email);
+    
+    if (user.user_metadata?.full_name) {
+      requestHeaders.set('oai-authenticated-user-full-name', user.user_metadata.full_name);
+    }
   }
 
   return NextResponse.next({

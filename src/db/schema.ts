@@ -68,7 +68,9 @@ export const allowedEmails = pgTable("allowed_emails", {
 // ---------- Users ----------
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
+  username: text("username").unique(),
   email: text("email").notNull().unique(),
+  passwordHash: text("password_hash"),
   fullName: text("full_name"),
   role: text("role").$type<Role>().notNull().default("tenant"),
   propertyId: integer("property_id").references(() => properties.id),
@@ -77,6 +79,7 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at"),
 }, (table) => ({
   emailIdx: uniqueIndex("users_email_idx").on(table.email),
+  usernameIdx: uniqueIndex("users_username_idx").on(table.username),
 }));
 
 

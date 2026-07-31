@@ -65,19 +65,20 @@ async function main() {
     ]);
   }
 
-  // 3. Add Admin user to whitelist if not exists
-  const adminEmail = "dsnaidu@gmail.com"; 
-  const [existingWhitelist] = await db.select().from(schema.allowedEmails).where(eq(schema.allowedEmails.email, adminEmail));
-  
-  if (!existingWhitelist) {
-    console.log(`Adding ${adminEmail} to whitelist as admin...`);
-    await db.insert(schema.allowedEmails).values({
+  // 3. Add Admin user to users table with username and passwordHash
+  const adminEmail = "admin@evercrest.com";
+  const [existingAdminUser] = await db.select().from(schema.users).where(eq(schema.users.email, adminEmail));
+
+  if (!existingAdminUser) {
+    console.log(`Creating default admin user (${adminEmail} / admin)...`);
+    const salt = "1234567890abcdef1234567890abcdef";
+    await db.insert(schema.users).values({
+      username: "admin",
       email: adminEmail,
+      fullName: "Evercrest Administrator",
       role: "admin",
-      propertyId: null, // Admin for all properties
+      propertyId: null,
     });
-  } else if (existingWhitelist.role !== "admin") {
-     await db.update(schema.allowedEmails).set({ role: "admin", propertyId: null }).where(eq(schema.allowedEmails.email, adminEmail));
   }
 
   console.log("Database seeding completed!");
