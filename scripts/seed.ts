@@ -1,17 +1,19 @@
 import { drizzle } from "drizzle-orm/postgres-js";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import postgres from "postgres";
 import * as schema from "../src/db/schema";
-import fs from "fs";
-import path from "path";
+import { hashPassword } from "../src/lib/auth/password";
 
-// Initialize DB connection
 const connectionString = process.env.DATABASE_URL || "postgres://dsnaidu@localhost:5432/evercrest";
 const client = postgres(connectionString);
 const db = drizzle(client, { schema });
 
 async function main() {
-  console.log("Seeding database...");
+  console.log("Running migration check & seeding database...");
+
+  // 0. Ensure columns exist on users table
+  await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "username" text UNIQUE;`);
+  await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "password_hash" text;`);
 
   // 1. Check if properties exist
   let properties = await db.select().from(schema.properties);
@@ -65,23 +67,32 @@ async function main() {
     ]);
   }
 
-  // 3. Add Admin user to users table with username and passwordHash
+  // 3. Ensure Demo Admin exists with valid passwordHash
   const adminEmail = "admin@evercrest.com";
+  const hashedPassword = await hashPassword("admin123");
+
   const [existingAdminUser] = await db.select().from(schema.users).where(eq(schema.users.email, adminEmail));
 
   if (!existingAdminUser) {
-    console.log(`Creating default admin user (${adminEmail} / admin)...`);
-    const salt = "1234567890abcdef1234567890abcdef";
+    console.log(`Creating demo admin user (username: admin, email: ${adminEmail})...`);
     await db.insert(schema.users).values({
       username: "admin",
       email: adminEmail,
       fullName: "Evercrest Administrator",
       role: "admin",
+      passwordHash: hashedPassword,
       propertyId: null,
     });
+  } else {
+    console.log("Updating demo admin user password hash...");
+    await db.update(schema.users).set({
+      username: "admin",
+      role: "admin",
+      passwordHash: hashedPassword,
+    }).where(eq(schema.users.id, existingAdminUser.id));
   }
 
-  console.log("Database seeding completed!");
+  console.log("Database migration & seeding completed successfully!");
   process.exit(0);
 }
 
