@@ -12,9 +12,10 @@ export type SessionPayload = {
 };
 
 export async function getSession(): Promise<SessionPayload | null> {
+  const cookieStore = await cookies();
+
   // 1. Check dedicated admin session cookie
   try {
-    const cookieStore = await cookies();
     const adminCookie = cookieStore.get("evercrest_admin_session");
     if (adminCookie?.value) {
       const decoded = JSON.parse(Buffer.from(adminCookie.value, "base64").toString("utf-8"));
@@ -31,32 +32,56 @@ export async function getSession(): Promise<SessionPayload | null> {
     console.error("Error reading admin session cookie:", err);
   }
 
-  // 2. Check Supabase tenant auth session
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getUser();
-
-  if (error || !data?.user?.email) {
-    return null;
+  // 2. Check dedicated tenant session cookie
+  try {
+    const tenantCookie = cookieStore.get("evercrest_tenant_session");
+    if (tenantCookie?.value) {
+      const decoded = JSON.parse(Buffer.from(tenantCookie.value, "base64").toString("utf-8"));
+      if (decoded.userId && decoded.email) {
+        return {
+          userId: Number(decoded.userId),
+          email: decoded.email,
+          role: decoded.role || "tenant",
+          propertyId: decoded.propertyId || null,
+        };
+      }
+    }
+  } catch (err) {
+    console.error("Error reading tenant session cookie:", err);
   }
 
-  const email = data.user.email;
+  // 3. Check Supabase tenant auth session
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.getUser();
 
-  // Fetch the local user record based on email
-  const [localUser] = await db.select().from(users).where(eq(users.email, email));
+    if (!error && data?.user?.email) {
+      const email = data.user.email;
+      const [localUser] = await db.select().from(users).where(eq(users.email, email));
 
-  if (!localUser) {
-    return null;
+      if (localUser) {
+        return {
+          userId: localUser.id,
+          email: localUser.email,
+          role: localUser.role,
+          propertyId: localUser.propertyId,
+        };
+      }
+    }
+  } catch (supabaseErr) {
+    // Graceful fallback if Supabase auth client encounters temporary network issues
   }
 
-  return {
-    userId: localUser.id,
-    email: localUser.email,
-    role: localUser.role,
-    propertyId: localUser.propertyId,
-  };
+  return null;
 }
 
 export async function clearSession() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  const cookieStore = await cookies();
+  cookieStore.delete("evercrest_tenant_session");
+  cookieStore.delete("evercrest_admin_session");
+
+  try {
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+  } catch (err) {}
 }
