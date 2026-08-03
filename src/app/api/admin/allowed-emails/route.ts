@@ -80,7 +80,14 @@ export async function POST(request: Request) {
       }
     }
 
-    const actorId = session.userId || null;
+    // Safely resolve actor user ID to avoid foreign key errors
+    let validActorId: number | null = null;
+    if (session.userId) {
+      const [actorUser] = await db.select().from(users).where(eq(users.id, session.userId));
+      if (actorUser) {
+        validActorId = actorUser.id;
+      }
+    }
 
     const [entry] = await db
       .insert(allowedEmails)
@@ -89,7 +96,7 @@ export async function POST(request: Request) {
         role: "tenant",
         propertyId: validPropertyId,
         propertyCode: cleanCode,
-        addedBy: actorId,
+        addedBy: validActorId,
       })
       .returning();
 
@@ -109,7 +116,7 @@ export async function POST(request: Request) {
     try {
       await db.insert(systemLogs).values({
         eventType: "admin.whitelist_updated",
-        actorUserId: actorId,
+        actorUserId: validActorId,
         metadata: { action: "added", email: cleanEmail, propertyCode: cleanCode },
       });
     } catch (logErr) {
@@ -118,10 +125,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ entry });
   } catch (error: any) {
-    if (error?.message?.includes("UNIQUE constraint failed") || error?.code === "23505") {
+    console.error("Error adding to whitelist:", error);
+    if (
+      error?.message?.includes("UNIQUE constraint failed") ||
+      error?.message?.includes("duplicate key") ||
+      error?.code === "23505"
+    ) {
       return NextResponse.json({ error: { code: "CONFLICT", message: "Email is already in the whitelist" } }, { status: 409 });
     }
-    return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Failed to add email to whitelist." } }, { status: 500 });
+    return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: error?.message || "Failed to add email to whitelist." } }, { status: 500 });
   }
 }
 
