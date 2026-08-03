@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Search, Shield, User, Building, FileSpreadsheet, Trash2, Edit2, X, Check, ArrowUpDown, Filter } from "lucide-react";
+import { Plus, Search, Shield, User, Building, FileSpreadsheet, Trash2, Edit2, X, Check, ArrowUpDown } from "lucide-react";
 
 type WhitelistEntry = {
   id: number;
@@ -32,21 +32,18 @@ export default function WhitelistPage() {
   const [searchTerm, setSearchTerm] = useState("");
 
   // Filters & Sorting
-  const [roleFilter, setRoleFilter] = useState<"all" | "tenant" | "admin">("all");
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<"code" | "email" | "role" | "newest">("code");
+  const [sortBy, setSortBy] = useState<"code" | "email" | "newest">("code");
   
   // Add form state
   const [newEmail, setNewEmail] = useState("");
   const [newPNum, setNewPNum] = useState("");
-  const [newRole, setNewRole] = useState<"tenant" | "admin">("tenant");
   const [newPropertyId, setNewPropertyId] = useState("");
 
   // Edit modal state
   const [editingEntry, setEditingEntry] = useState<WhitelistEntry | null>(null);
   const [editEmail, setEditEmail] = useState("");
   const [editPNum, setEditPNum] = useState("");
-  const [editRole, setEditRole] = useState<"tenant" | "admin">("tenant");
   const [editPropertyId, setEditPropertyId] = useState("");
 
   const fetchData = () => {
@@ -76,12 +73,9 @@ export default function WhitelistPage() {
         entry.email.toLowerCase().includes(query) ||
         (entry.propertyCode || "").toLowerCase().includes(query) ||
         (entry.propertyAddress || "").toLowerCase().includes(query) ||
-        (entry.city || "").toLowerCase().includes(query) ||
-        entry.role.toLowerCase().includes(query);
+        (entry.city || "").toLowerCase().includes(query);
 
       if (!matchesSearch) return false;
-
-      if (roleFilter !== "all" && entry.role !== roleFilter) return false;
 
       if (propertyFilter !== "all") {
         if (propertyFilter === "unassigned") {
@@ -103,9 +97,6 @@ export default function WhitelistPage() {
       if (sortBy === "email") {
         return a.email.localeCompare(b.email);
       }
-      if (sortBy === "role") {
-        return a.role.localeCompare(b.role);
-      }
       if (sortBy === "newest") {
         return b.id - a.id;
       }
@@ -113,13 +104,13 @@ export default function WhitelistPage() {
     });
 
     return result;
-  }, [entries, searchTerm, roleFilter, propertyFilter, sortBy]);
+  }, [entries, searchTerm, propertyFilter, sortBy]);
 
   const stats = useMemo(() => {
-    const tenants = entries.filter((e) => e.role === "tenant").length;
-    const admins = entries.filter((e) => e.role === "admin").length;
+    const totalTenants = entries.length;
     const mappedProperties = new Set(entries.map((e) => e.propertyId).filter(Boolean)).size;
-    return { tenants, admins, mappedProperties, total: entries.length };
+    const unassigned = entries.filter((e) => !e.propertyId && !e.propertyCode).length;
+    return { totalTenants, mappedProperties, unassigned };
   }, [entries]);
 
   // Handlers for Add Form P# and Property Sync
@@ -153,7 +144,7 @@ export default function WhitelistPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: newEmail,
-          role: newRole,
+          role: "tenant",
           propertyId: newPropertyId ? parseInt(newPropertyId) : null,
           propertyCode: newPNum ? newPNum.trim() : null,
         }),
@@ -177,7 +168,6 @@ export default function WhitelistPage() {
     setEditingEntry(entry);
     setEditEmail(entry.email);
     setEditPNum(entry.propertyCode || "");
-    setEditRole(entry.role);
     setEditPropertyId(entry.propertyId ? String(entry.propertyId) : "");
   };
 
@@ -213,7 +203,7 @@ export default function WhitelistPage() {
         body: JSON.stringify({
           id: editingEntry.id,
           email: editEmail,
-          role: editRole,
+          role: "tenant",
           propertyId: editPropertyId ? parseInt(editPropertyId) : null,
           propertyCode: editPNum ? editPNum.trim() : null,
         }),
@@ -231,7 +221,7 @@ export default function WhitelistPage() {
   };
 
   const handleDelete = async (id: number, email: string) => {
-    if (!confirm(`Are you sure you want to remove ${email} from the whitelist?`)) return;
+    if (!confirm(`Are you sure you want to remove ${email} from the resident whitelist?`)) return;
     try {
       const res = await fetch("/api/admin/allowed-emails", {
         method: "DELETE",
@@ -249,37 +239,29 @@ export default function WhitelistPage() {
     }
   };
 
-  if (loading) return <div className="p-8 text-gray-500">Loading access whitelist...</div>;
+  if (loading) return <div className="p-8 text-gray-500">Loading resident access whitelist...</div>;
 
   return (
     <div className="space-y-6 text-[#191919]">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Access Whitelist</h1>
-          <p className="text-xs text-gray-500 mt-1">Appfolio synced resident directory & admin access whitelist.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Resident Access Whitelist</h1>
+          <p className="text-xs text-gray-500 mt-1">Appfolio synced resident directory & property access control.</p>
         </div>
         <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl text-xs font-semibold text-indigo-700">
           <FileSpreadsheet size={15} />
-          <span>Appfolio Synced ({stats.total} Whitelisted)</span>
+          <span>Appfolio Synced ({stats.totalTenants} Whitelisted Residents)</span>
         </div>
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-1">
           <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
             <User size={16} className="text-blue-500" />
-            <span>Total Whitelisted</span>
+            <span>Whitelisted Residents</span>
           </div>
-          <div className="text-xl font-bold text-slate-900 mt-1">{stats.total} Users</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-1">
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
-            <User size={16} className="text-emerald-500" />
-            <span>Whitelisted Tenants</span>
-          </div>
-          <div className="text-xl font-bold text-slate-900 mt-1">{stats.tenants} Tenants</div>
+          <div className="text-xl font-bold text-slate-900 mt-1">{stats.totalTenants} Residents</div>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-1">
@@ -292,19 +274,19 @@ export default function WhitelistPage() {
 
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-1">
           <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
-            <Shield size={16} className="text-purple-500" />
-            <span>Admin Users</span>
+            <Shield size={16} className="text-amber-500" />
+            <span>General / Unassigned</span>
           </div>
-          <div className="text-xl font-bold text-slate-900 mt-1">{stats.admins} Admins</div>
+          <div className="text-xl font-bold text-slate-900 mt-1">{stats.unassigned} Entries</div>
         </div>
       </div>
 
       {/* Add New Whitelist Entry Form */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-2xs space-y-4">
-        <h2 className="text-sm font-semibold text-gray-900">Add New Whitelisted User</h2>
+        <h2 className="text-sm font-semibold text-gray-900">Add Whitelisted Resident</h2>
         <form onSubmit={handleAdd} className="flex flex-wrap md:flex-nowrap gap-3 items-end">
-          <div className="flex-1 min-w-[180px]">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Email Address</label>
+          <div className="flex-1 min-w-[220px]">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Resident Email Address</label>
             <input
               type="email"
               required
@@ -324,18 +306,7 @@ export default function WhitelistPage() {
               placeholder="e.g. P141"
             />
           </div>
-          <div className="w-28">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Role</label>
-            <select
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value as any)}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
-            >
-              <option value="tenant">Tenant</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-          <div className="w-64">
+          <div className="w-72">
             <label className="block text-xs font-semibold text-gray-600 mb-1">Assigned Property</label>
             <select
               value={newPropertyId}
@@ -354,7 +325,7 @@ export default function WhitelistPage() {
             type="submit"
             className="bg-[#191919] text-white text-xs font-medium px-4 py-2 rounded-xl hover:bg-gray-800 flex items-center gap-1.5 transition-all cursor-pointer h-[34px]"
           >
-            <Plus size={15} /> Add to Whitelist
+            <Plus size={15} /> Add Resident
           </button>
         </form>
       </div>
@@ -365,7 +336,7 @@ export default function WhitelistPage() {
           <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-md w-full p-6 space-y-4">
             <div className="flex justify-between items-center border-b border-gray-100 pb-3">
               <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <Edit2 size={16} className="text-blue-600" /> Edit Whitelisted User
+                <Edit2 size={16} className="text-blue-600" /> Edit Whitelisted Resident
               </h3>
               <button
                 onClick={() => setEditingEntry(null)}
@@ -376,7 +347,7 @@ export default function WhitelistPage() {
             </div>
             <form onSubmit={handleUpdate} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Whitelisted Email</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Resident Email Address</label>
                 <input
                   type="email"
                   required
@@ -385,28 +356,15 @@ export default function WhitelistPage() {
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">P# Code</label>
-                  <input
-                    type="text"
-                    value={editPNum}
-                    onChange={(e) => handleEditPNumChange(e.target.value)}
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:border-blue-500 uppercase"
-                    placeholder="e.g. P141"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Role</label>
-                  <select
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value as any)}
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
-                  >
-                    <option value="tenant">Tenant</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">P# Code</label>
+                <input
+                  type="text"
+                  value={editPNum}
+                  onChange={(e) => handleEditPNumChange(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:border-blue-500 uppercase"
+                  placeholder="e.g. P141"
+                />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Assigned Property</label>
@@ -448,7 +406,7 @@ export default function WhitelistPage() {
         <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-wrap gap-4">
           <div className="flex items-center gap-2">
             <Shield size={16} className="text-blue-600" />
-            <h3 className="text-sm font-semibold text-slate-900">Whitelisted Directory ({filteredEntries.length})</h3>
+            <h3 className="text-sm font-semibold text-slate-900">Whitelisted Resident Directory ({filteredEntries.length})</h3>
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
@@ -460,26 +418,15 @@ export default function WhitelistPage() {
                 placeholder="Search email, P#, address..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-1.5 rounded-xl border border-gray-300 text-xs w-60 focus:outline-none focus:border-blue-500"
+                className="pl-9 pr-3 py-1.5 rounded-xl border border-gray-300 text-xs w-64 focus:outline-none focus:border-blue-500"
               />
             </div>
-
-            {/* Role Filter */}
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as any)}
-              className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none focus:border-blue-500"
-            >
-              <option value="all">All Roles</option>
-              <option value="tenant">Tenants Only</option>
-              <option value="admin">Admins Only</option>
-            </select>
 
             {/* Property Filter */}
             <select
               value={propertyFilter}
               onChange={(e) => setPropertyFilter(e.target.value)}
-              className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none focus:border-blue-500 max-w-[180px]"
+              className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none focus:border-blue-500 max-w-[200px]"
             >
               <option value="all">All Properties</option>
               <option value="unassigned">Unassigned / General</option>
@@ -500,7 +447,6 @@ export default function WhitelistPage() {
               >
                 <option value="code">Sort: P# Code (A-Z)</option>
                 <option value="email">Sort: Email (A-Z)</option>
-                <option value="role">Sort: Role</option>
                 <option value="newest">Sort: Date Added</option>
               </select>
             </div>
@@ -511,9 +457,8 @@ export default function WhitelistPage() {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 border-b border-gray-200 text-slate-600 font-semibold">
               <tr>
-                <th className="px-6 py-3">Whitelisted Email</th>
+                <th className="px-6 py-3">Resident Whitelisted Email</th>
                 <th className="px-6 py-3">P# Code</th>
-                <th className="px-6 py-3">Role</th>
                 <th className="px-6 py-3">Assigned Property Address</th>
                 <th className="px-6 py-3">Added Date</th>
                 <th className="px-6 py-3 text-right">Actions</th>
@@ -532,17 +477,6 @@ export default function WhitelistPage() {
                       ) : (
                         <span className="text-gray-400 italic">—</span>
                       )}
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${
-                          entry.role === "admin"
-                            ? "bg-purple-50 text-purple-700 border border-purple-200"
-                            : "bg-blue-50 text-blue-700 border border-blue-200"
-                        }`}
-                      >
-                        {entry.role}
-                      </span>
                     </td>
                     <td className="px-6 py-3.5 text-slate-600">
                       {entry.propertyAddress ? (
@@ -576,8 +510,8 @@ export default function WhitelistPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-400 italic">
-                    No matching whitelist entries found.
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-400 italic">
+                    No matching resident whitelist entries found.
                   </td>
                 </tr>
               )}
