@@ -18,8 +18,9 @@ type TenantRow = {
 };
 
 async function main() {
-  console.log("Ensuring database schema column properties.code exists...");
+  console.log("Ensuring database schema columns properties.code and allowed_emails.property_code exist...");
   await client`ALTER TABLE properties ADD COLUMN IF NOT EXISTS code text;`;
+  await client`ALTER TABLE allowed_emails ADD COLUMN IF NOT EXISTS property_code text;`;
 
   console.log("Reading Appfolio email table_1.xlsx...");
   const filePath = path.join(process.cwd(), "Appfolio email table_1.xlsx");
@@ -77,7 +78,7 @@ async function main() {
       let propId: number;
       if (existingProp) {
         propId = existingProp.id;
-        if (tenant.pNum && !existingProp.code) {
+        if (tenant.pNum) {
           await db.update(schema.properties).set({ code: tenant.pNum }).where(eq(schema.properties.id, propId));
         }
       } else {
@@ -116,11 +117,13 @@ async function main() {
         email: tenant.email,
         role: "tenant",
         propertyId: propId,
+        propertyCode: tenant.pNum,
       });
       insertedWhitelist++;
     } else {
       await db.update(schema.allowedEmails).set({
         propertyId: propId,
+        propertyCode: tenant.pNum,
         role: "tenant",
       }).where(eq(schema.allowedEmails.email, tenant.email));
     }

@@ -60,6 +60,7 @@ export const allowedEmails = pgTable("allowed_emails", {
   email: text("email").notNull().unique(),
   role: text("role").$type<Role>().notNull().default("tenant"),
   propertyId: integer("property_id").references(() => properties.id), // Added for multi-property
+  propertyCode: text("property_code"), // P# Code (e.g. P141, P102, P999)
   addedBy: integer("added_by"), // FK -> users.id (admin who added this entry)
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({

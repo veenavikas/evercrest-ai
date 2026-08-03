@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { allowedEmails, properties, users, systemLogs } from "@/db/schema";
 import { getSession } from "@/lib/auth/session";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 export async function GET(request: Request) {
   try {
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
       email: allowedEmails.email,
       role: allowedEmails.role,
       propertyId: allowedEmails.propertyId,
-      propertyCode: properties.code,
+      propertyCode: sql<string>`COALESCE(${allowedEmails.propertyCode}, ${properties.code})`,
       propertyName: properties.name,
       propertyAddress: properties.addressLine1,
       city: properties.city,
@@ -47,6 +47,7 @@ export async function POST(request: Request) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = propertyCode ? String(propertyCode).trim() : null;
 
     let validPropertyId: number | null = null;
     if (propertyId && !isNaN(Number(propertyId))) {
@@ -54,9 +55,11 @@ export async function POST(request: Request) {
       const [propCheck] = await db.select().from(properties).where(eq(properties.id, numPropId));
       if (propCheck) {
         validPropertyId = propCheck.id;
+        if (cleanCode && !propCheck.code) {
+          await db.update(properties).set({ code: cleanCode }).where(eq(properties.id, propCheck.id));
+        }
       }
-    } else if (propertyCode && typeof propertyCode === "string" && propertyCode.trim()) {
-      const cleanCode = propertyCode.trim();
+    } else if (cleanCode) {
       const [propCheck] = await db.select().from(properties).where(eq(properties.code, cleanCode));
       if (propCheck) {
         validPropertyId = propCheck.id;
@@ -73,6 +76,7 @@ export async function POST(request: Request) {
       email: cleanEmail,
       role: role || "tenant",
       propertyId: validPropertyId,
+      propertyCode: cleanCode,
       addedBy: actorId,
     }).returning();
 
@@ -85,13 +89,15 @@ export async function POST(request: Request) {
         role: role || "tenant",
         propertyId: validPropertyId,
       });
+    } else if (validPropertyId) {
+      await db.update(users).set({ propertyId: validPropertyId }).where(eq(users.email, cleanEmail));
     }
 
     try {
       await db.insert(systemLogs).values({
         eventType: "admin.whitelist_updated",
         actorUserId: actorId,
-        metadata: { action: "added", email: cleanEmail },
+        metadata: { action: "added", email: cleanEmail, propertyCode: cleanCode },
       });
     } catch (logErr) {
       console.warn("Writing system log skipped:", logErr);
@@ -122,17 +128,21 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Entry ID is required for editing" } }, { status: 400 });
     }
 
+    const cleanCode = propertyCode ? String(propertyCode).trim() : null;
     let validPropertyId: number | null = null;
+
     if (propertyId !== undefined && propertyId !== null && propertyId !== "") {
       const numPropId = Number(propertyId);
       if (!isNaN(numPropId)) {
         const [propCheck] = await db.select().from(properties).where(eq(properties.id, numPropId));
         if (propCheck) {
           validPropertyId = propCheck.id;
+          if (cleanCode) {
+            await db.update(properties).set({ code: cleanCode }).where(eq(properties.id, propCheck.id));
+          }
         }
       }
-    } else if (propertyCode && typeof propertyCode === "string" && propertyCode.trim()) {
-      const cleanCode = propertyCode.trim();
+    } else if (cleanCode) {
       const [propCheck] = await db.select().from(properties).where(eq(properties.code, cleanCode));
       if (propCheck) {
         validPropertyId = propCheck.id;
@@ -145,6 +155,7 @@ export async function PATCH(request: Request) {
       ...(cleanEmail ? { email: cleanEmail } : {}),
       ...(role ? { role } : {}),
       propertyId: validPropertyId,
+      propertyCode: cleanCode,
     }).where(eq(allowedEmails.id, Number(id))).returning();
 
     if (cleanEmail) {
