@@ -34,6 +34,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/documents", label: "Documents", icon: FileText },
     { href: "/admin/whitelist", label: "Whitelist", icon: Users },
     { href: "/admin/system-logs", label: "System Logs", icon: Settings },
+    { href: "/admin/settings", label: "Settings", icon: Settings },
   ];
 
   return (
