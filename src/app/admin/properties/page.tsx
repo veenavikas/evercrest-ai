@@ -316,7 +316,6 @@ export default function AdminPropertiesPage() {
                 <th className="px-6 py-3">Address</th>
                 <th className="px-6 py-3">Occupied / Tenants</th>
                 <th className="px-6 py-3">Occupancy Status & Activity</th>
-                <th className="px-6 py-3">Contact</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -368,15 +367,11 @@ export default function AdminPropertiesPage() {
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-3.5 text-gray-500">
-                    <div>{p.contactEmail || "N/A"}</div>
-                    <div className="text-[10px]">{p.contactPhone || "—"}</div>
-                  </td>
                 </tr>
               ))}
               {filteredProperties.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-400 italic">
+                  <td colSpan={4} className="px-6 py-8 text-center text-gray-400 italic">
                     No matching properties found.
                   </td>
                 </tr>
