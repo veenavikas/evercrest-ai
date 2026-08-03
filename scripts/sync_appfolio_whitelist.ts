@@ -18,6 +18,9 @@ type TenantRow = {
 };
 
 async function main() {
+  console.log("Ensuring database schema column properties.code exists...");
+  await client`ALTER TABLE properties ADD COLUMN IF NOT EXISTS code text;`;
+
   console.log("Reading Appfolio email table_1.xlsx...");
   const filePath = path.join(process.cwd(), "Appfolio email table_1.xlsx");
   const wb = XLSX.readFile(filePath);
@@ -42,7 +45,7 @@ async function main() {
             parsedTenants.push({
               pNum,
               address,
-              name: String(row[nameKey] || "").trim() || "Evercrest Resident",
+              name: String(row[nameKey] || "").trim() || "CrestFix Resident",
               phone: String(row[phoneKey] || "").trim(),
               email: cleanEmail,
             });
@@ -54,14 +57,13 @@ async function main() {
 
   console.log(`Extracted ${parsedTenants.length} tenant email entries from Excel.`);
 
-  // 1. Group by unique Property Address & insert properties
+  // 1. Group by unique Property Address & insert/update properties with P# code
   const propertyMap = new Map<string, number>();
 
   for (const tenant of parsedTenants) {
     if (!tenant.address) continue;
     
     if (!propertyMap.has(tenant.address)) {
-      // Helper to parse city, state, zip from address
       const parts = tenant.address.split(",");
       const addressLine1 = parts[0]?.trim() || tenant.address;
       const city = parts[1]?.trim() || "Missouri City";
@@ -75,15 +77,19 @@ async function main() {
       let propId: number;
       if (existingProp) {
         propId = existingProp.id;
+        if (tenant.pNum && !existingProp.code) {
+          await db.update(schema.properties).set({ code: tenant.pNum }).where(eq(schema.properties.id, propId));
+        }
       } else {
         const [newProp] = await db.insert(schema.properties).values({
           name: tenant.address,
+          code: tenant.pNum,
           slug: tenant.address.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
           addressLine1,
           city,
           state,
           postalCode,
-          description: `Residential single-family / unit property ${tenant.pNum}`,
+          description: `Residential property ${tenant.pNum}`,
           contactEmail: tenant.email,
           contactPhone: tenant.phone || "555-0199",
           isActive: true,
@@ -104,7 +110,6 @@ async function main() {
   for (const tenant of parsedTenants) {
     const propId = propertyMap.get(tenant.address) ?? null;
 
-    // Check allowed_emails
     const [existingAllowed] = await db.select().from(schema.allowedEmails).where(eq(schema.allowedEmails.email, tenant.email));
     if (!existingAllowed) {
       await db.insert(schema.allowedEmails).values({
@@ -120,7 +125,6 @@ async function main() {
       }).where(eq(schema.allowedEmails.email, tenant.email));
     }
 
-    // Check users
     const [existingUser] = await db.select().from(schema.users).where(eq(schema.users.email, tenant.email));
     if (!existingUser) {
       await db.insert(schema.users).values({

@@ -24,6 +24,7 @@ export type DocumentCategory = "lease" | "policy" | "notice" | "other";
 export const properties = pgTable("properties", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  code: text("code"), // P# (Property Number e.g. P141, P102)
   slug: text("slug").notNull().unique(), // used in property-specific URLs
   addressLine1: text("address_line1").notNull(),
   addressLine2: text("address_line2"),

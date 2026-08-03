@@ -16,6 +16,7 @@ export async function GET(request: Request) {
       email: allowedEmails.email,
       role: allowedEmails.role,
       propertyId: allowedEmails.propertyId,
+      propertyCode: properties.code,
       propertyName: properties.name,
       propertyAddress: properties.addressLine1,
       city: properties.city,
@@ -105,6 +106,52 @@ export async function POST(request: Request) {
     }
     console.error("Error adding to whitelist:", error);
     return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Failed to add email to whitelist." } }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== "admin") {
+      return NextResponse.json({ error: { code: "FORBIDDEN", message: "Admin access required" } }, { status: 403 });
+    }
+
+    const { id, email, role, propertyId } = await request.json();
+    if (!id) {
+      return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Entry ID is required for editing" } }, { status: 400 });
+    }
+
+    let validPropertyId: number | null = null;
+    if (propertyId !== undefined && propertyId !== null && propertyId !== "") {
+      const numPropId = Number(propertyId);
+      if (!isNaN(numPropId)) {
+        const [propCheck] = await db.select().from(properties).where(eq(properties.id, numPropId));
+        if (propCheck) {
+          validPropertyId = propCheck.id;
+        }
+      }
+    }
+
+    const cleanEmail = email ? String(email).trim().toLowerCase() : undefined;
+
+    const [updated] = await db.update(allowedEmails).set({
+      ...(cleanEmail ? { email: cleanEmail } : {}),
+      ...(role ? { role } : {}),
+      propertyId: validPropertyId,
+    }).where(eq(allowedEmails.id, Number(id))).returning();
+
+    if (cleanEmail) {
+      await db.update(users).set({
+        email: cleanEmail,
+        role: role || "tenant",
+        propertyId: validPropertyId,
+      }).where(eq(users.email, cleanEmail));
+    }
+
+    return NextResponse.json({ entry: updated });
+  } catch (error: any) {
+    console.error("Error updating whitelist entry:", error);
+    return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Failed to update whitelist entry." } }, { status: 500 });
   }
 }
 
