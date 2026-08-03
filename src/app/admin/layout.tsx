@@ -30,7 +30,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/conversations", label: "Conversations", icon: MessageSquare },
     { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/admin/properties", label: "Properties", icon: Building },
-    { href: "/admin/amenities", label: "Amenities", icon: Calendar },
     { href: "/admin/announcements", label: "Announcements", icon: Bell },
     { href: "/admin/documents", label: "Documents", icon: FileText },
     { href: "/admin/whitelist", label: "Whitelist", icon: Users },
