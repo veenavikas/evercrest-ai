@@ -70,12 +70,16 @@ export default function AdminAnnouncementsPage() {
       });
 
       if (res.ok) {
+        const d = await res.json();
         setIsModalOpen(false);
         setTitle("");
         setContent("");
         setPropertyId("");
         setIsImportant(false);
         fetchData();
+        if (d.recipientsCount !== undefined) {
+          alert(`📢 Announcement published! Email notification dispatched to ${d.recipientsCount} whitelisted resident${d.recipientsCount === 1 ? '' : 's'}.`);
+        }
       } else {
         const err = await res.json();
         alert(err.error?.message || "Failed to post announcement");
