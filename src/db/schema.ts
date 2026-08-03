@@ -210,7 +210,7 @@ export const amenityBookings = pgTable("amenity_bookings", {
 // ---------- Announcements ----------
 export const announcements = pgTable("announcements", {
   id: serial("id").primaryKey(),
-  propertyId: integer("property_id").notNull().references(() => properties.id),
+  propertyId: integer("property_id").references(() => properties.id), // null = all properties / global broadcast
   title: text("title").notNull(),
   body: text("body").notNull(),
   priority: text("priority").$type<AnnouncementPriority>().notNull().default("normal"),
