@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: { code: "FORBIDDEN", message: "Admin access required" } }, { status: 403 });
     }
 
-    const { email, role, propertyId } = await request.json();
+    const { email, role, propertyId, propertyCode } = await request.json();
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Valid email address is required" } }, { status: 400 });
     }
@@ -54,11 +54,12 @@ export async function POST(request: Request) {
       const [propCheck] = await db.select().from(properties).where(eq(properties.id, numPropId));
       if (propCheck) {
         validPropertyId = propCheck.id;
-      } else {
-        return NextResponse.json(
-          { error: { code: "NOT_FOUND", message: `Property ID ${propertyId} does not exist. Please select a valid property.` } },
-          { status: 400 }
-        );
+      }
+    } else if (propertyCode && typeof propertyCode === "string" && propertyCode.trim()) {
+      const cleanCode = propertyCode.trim();
+      const [propCheck] = await db.select().from(properties).where(eq(properties.code, cleanCode));
+      if (propCheck) {
+        validPropertyId = propCheck.id;
       }
     }
 
@@ -116,7 +117,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: { code: "FORBIDDEN", message: "Admin access required" } }, { status: 403 });
     }
 
-    const { id, email, role, propertyId } = await request.json();
+    const { id, email, role, propertyId, propertyCode } = await request.json();
     if (!id) {
       return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Entry ID is required for editing" } }, { status: 400 });
     }
@@ -129,6 +130,12 @@ export async function PATCH(request: Request) {
         if (propCheck) {
           validPropertyId = propCheck.id;
         }
+      }
+    } else if (propertyCode && typeof propertyCode === "string" && propertyCode.trim()) {
+      const cleanCode = propertyCode.trim();
+      const [propCheck] = await db.select().from(properties).where(eq(properties.code, cleanCode));
+      if (propCheck) {
+        validPropertyId = propCheck.id;
       }
     }
 
