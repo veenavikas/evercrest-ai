@@ -33,12 +33,14 @@ export default function WhitelistPage() {
   
   // Add form state
   const [newEmail, setNewEmail] = useState("");
+  const [newPNum, setNewPNum] = useState("");
   const [newRole, setNewRole] = useState<"tenant" | "admin">("tenant");
   const [newPropertyId, setNewPropertyId] = useState("");
 
   // Edit modal state
   const [editingEntry, setEditingEntry] = useState<WhitelistEntry | null>(null);
   const [editEmail, setEditEmail] = useState("");
+  const [editPNum, setEditPNum] = useState("");
   const [editRole, setEditRole] = useState<"tenant" | "admin">("tenant");
   const [editPropertyId, setEditPropertyId] = useState("");
 
@@ -82,6 +84,29 @@ export default function WhitelistPage() {
     return { tenants, admins, mappedProperties, total: entries.length };
   }, [entries]);
 
+  // Handlers for Add Form P# and Property Sync
+  const handleNewPNumChange = (val: string) => {
+    setNewPNum(val);
+    const clean = val.trim().toLowerCase();
+    if (!clean) return;
+    const matched = propertiesList.find((p) => (p.code || "").toLowerCase() === clean);
+    if (matched) {
+      setNewPropertyId(String(matched.id));
+    }
+  };
+
+  const handleNewPropertyIdChange = (val: string) => {
+    setNewPropertyId(val);
+    if (!val) {
+      setNewPNum("");
+      return;
+    }
+    const matched = propertiesList.find((p) => p.id === parseInt(val));
+    if (matched && matched.code) {
+      setNewPNum(matched.code);
+    }
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -92,10 +117,12 @@ export default function WhitelistPage() {
           email: newEmail,
           role: newRole,
           propertyId: newPropertyId ? parseInt(newPropertyId) : null,
+          propertyCode: newPNum ? newPNum.trim() : null,
         }),
       });
       if (res.ok) {
         setNewEmail("");
+        setNewPNum("");
         setNewPropertyId("");
         fetchData();
       } else {
@@ -107,11 +134,35 @@ export default function WhitelistPage() {
     }
   };
 
+  // Handlers for Edit Modal P# and Property Sync
   const startEdit = (entry: WhitelistEntry) => {
     setEditingEntry(entry);
     setEditEmail(entry.email);
+    setEditPNum(entry.propertyCode || "");
     setEditRole(entry.role);
     setEditPropertyId(entry.propertyId ? String(entry.propertyId) : "");
+  };
+
+  const handleEditPNumChange = (val: string) => {
+    setEditPNum(val);
+    const clean = val.trim().toLowerCase();
+    if (!clean) return;
+    const matched = propertiesList.find((p) => (p.code || "").toLowerCase() === clean);
+    if (matched) {
+      setEditPropertyId(String(matched.id));
+    }
+  };
+
+  const handleEditPropertyIdChange = (val: string) => {
+    setEditPropertyId(val);
+    if (!val) {
+      setEditPNum("");
+      return;
+    }
+    const matched = propertiesList.find((p) => p.id === parseInt(val));
+    if (matched && matched.code) {
+      setEditPNum(matched.code);
+    }
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
@@ -126,6 +177,7 @@ export default function WhitelistPage() {
           email: editEmail,
           role: editRole,
           propertyId: editPropertyId ? parseInt(editPropertyId) : null,
+          propertyCode: editPNum ? editPNum.trim() : null,
         }),
       });
       if (res.ok) {
@@ -209,11 +261,11 @@ export default function WhitelistPage() {
         </div>
       </div>
 
-      {/* Add New Whitelist Entry */}
+      {/* Add New Whitelist Entry Form */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-2xs space-y-4">
         <h2 className="text-sm font-semibold text-gray-900">Add New Whitelisted User</h2>
         <form onSubmit={handleAdd} className="flex flex-wrap md:flex-nowrap gap-3 items-end">
-          <div className="flex-1 min-w-[200px]">
+          <div className="flex-1 min-w-[180px]">
             <label className="block text-xs font-semibold text-gray-600 mb-1">Email Address</label>
             <input
               type="email"
@@ -224,7 +276,17 @@ export default function WhitelistPage() {
               placeholder="resident@example.com"
             />
           </div>
-          <div className="w-32">
+          <div className="w-36">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">P# Code</label>
+            <input
+              type="text"
+              value={newPNum}
+              onChange={(e) => handleNewPNumChange(e.target.value)}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:border-blue-500 uppercase"
+              placeholder="e.g. P141"
+            />
+          </div>
+          <div className="w-28">
             <label className="block text-xs font-semibold text-gray-600 mb-1">Role</label>
             <select
               value={newRole}
@@ -235,11 +297,11 @@ export default function WhitelistPage() {
               <option value="admin">Admin</option>
             </select>
           </div>
-          <div className="w-72">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Assigned Property (P# Code & Address)</label>
+          <div className="w-64">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Assigned Property</label>
             <select
               value={newPropertyId}
-              onChange={(e) => setNewPropertyId(e.target.value)}
+              onChange={(e) => handleNewPropertyIdChange(e.target.value)}
               className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
             >
               <option value="">No Property / All Properties</option>
@@ -285,22 +347,34 @@ export default function WhitelistPage() {
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Role</label>
-                <select
-                  value={editRole}
-                  onChange={(e) => setEditRole(e.target.value as any)}
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
-                >
-                  <option value="tenant">Tenant</option>
-                  <option value="admin">Admin</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">P# Code</label>
+                  <input
+                    type="text"
+                    value={editPNum}
+                    onChange={(e) => handleEditPNumChange(e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:border-blue-500 uppercase"
+                    placeholder="e.g. P141"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Role</label>
+                  <select
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value as any)}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
+                  >
+                    <option value="tenant">Tenant</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Assigned Property (P# Code & Address)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Assigned Property</label>
                 <select
                   value={editPropertyId}
-                  onChange={(e) => setEditPropertyId(e.target.value)}
+                  onChange={(e) => handleEditPropertyIdChange(e.target.value)}
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
                 >
                   <option value="">No Property / All Properties</option>
