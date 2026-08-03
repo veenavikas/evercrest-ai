@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Search, Shield, User, Building, FileSpreadsheet, Trash2, Edit2, X, Check } from "lucide-react";
+import { Plus, Search, Shield, User, Building, FileSpreadsheet, Trash2, Edit2, X, Check, ArrowUpDown, Filter } from "lucide-react";
 
 type WhitelistEntry = {
   id: number;
@@ -30,6 +30,11 @@ export default function WhitelistPage() {
   const [propertiesList, setPropertiesList] = useState<PropertyOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Filters & Sorting
+  const [roleFilter, setRoleFilter] = useState<"all" | "tenant" | "admin">("all");
+  const [propertyFilter, setPropertyFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"code" | "email" | "role" | "newest">("code");
   
   // Add form state
   const [newEmail, setNewEmail] = useState("");
@@ -65,17 +70,50 @@ export default function WhitelistPage() {
   }, []);
 
   const filteredEntries = useMemo(() => {
-    const query = searchTerm.toLowerCase();
-    return entries.filter((entry) => {
-      return (
+    let result = entries.filter((entry) => {
+      const query = searchTerm.toLowerCase();
+      const matchesSearch =
         entry.email.toLowerCase().includes(query) ||
         (entry.propertyCode || "").toLowerCase().includes(query) ||
         (entry.propertyAddress || "").toLowerCase().includes(query) ||
         (entry.city || "").toLowerCase().includes(query) ||
-        entry.role.toLowerCase().includes(query)
-      );
+        entry.role.toLowerCase().includes(query);
+
+      if (!matchesSearch) return false;
+
+      if (roleFilter !== "all" && entry.role !== roleFilter) return false;
+
+      if (propertyFilter !== "all") {
+        if (propertyFilter === "unassigned") {
+          if (entry.propertyId || entry.propertyCode) return false;
+        } else {
+          const filterPropId = Number(propertyFilter);
+          if (entry.propertyId !== filterPropId && entry.propertyCode !== propertyFilter) return false;
+        }
+      }
+
+      return true;
     });
-  }, [entries, searchTerm]);
+
+    // Sorting logic
+    result.sort((a, b) => {
+      if (sortBy === "code") {
+        return (a.propertyCode || "ZZZ").localeCompare(b.propertyCode || "ZZZ", undefined, { numeric: true });
+      }
+      if (sortBy === "email") {
+        return a.email.localeCompare(b.email);
+      }
+      if (sortBy === "role") {
+        return a.role.localeCompare(b.role);
+      }
+      if (sortBy === "newest") {
+        return b.id - a.id;
+      }
+      return 0;
+    });
+
+    return result;
+  }, [entries, searchTerm, roleFilter, propertyFilter, sortBy]);
 
   const stats = useMemo(() => {
     const tenants = entries.filter((e) => e.role === "tenant").length;
@@ -405,22 +443,67 @@ export default function WhitelistPage() {
         </div>
       )}
 
-      {/* Whitelist Directory Table */}
+      {/* Whitelist Directory Table & Controls */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-wrap gap-4">
           <div className="flex items-center gap-2">
             <Shield size={16} className="text-blue-600" />
             <h3 className="text-sm font-semibold text-slate-900">Whitelisted Directory ({filteredEntries.length})</h3>
           </div>
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by email, P# code, or property address..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-3 py-1.5 rounded-xl border border-gray-300 text-xs w-80 focus:outline-none focus:border-blue-500"
-            />
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Search */}
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search email, P#, address..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 pr-3 py-1.5 rounded-xl border border-gray-300 text-xs w-60 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Role Filter */}
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as any)}
+              className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none focus:border-blue-500"
+            >
+              <option value="all">All Roles</option>
+              <option value="tenant">Tenants Only</option>
+              <option value="admin">Admins Only</option>
+            </select>
+
+            {/* Property Filter */}
+            <select
+              value={propertyFilter}
+              onChange={(e) => setPropertyFilter(e.target.value)}
+              className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none focus:border-blue-500 max-w-[180px]"
+            >
+              <option value="all">All Properties</option>
+              <option value="unassigned">Unassigned / General</option>
+              {propertiesList.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.code ? `[${p.code}] ` : ""}{p.addressLine1}
+                </option>
+              ))}
+            </select>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 px-2.5 py-1 rounded-xl border border-gray-200">
+              <ArrowUpDown size={14} className="text-gray-500" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value="code">Sort: P# Code (A-Z)</option>
+                <option value="email">Sort: Email (A-Z)</option>
+                <option value="role">Sort: Role</option>
+                <option value="newest">Sort: Date Added</option>
+              </select>
+            </div>
           </div>
         </div>
 

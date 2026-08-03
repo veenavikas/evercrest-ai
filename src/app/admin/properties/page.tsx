@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Building2, User, Wrench, Search, CheckCircle2, AlertCircle, X, Check, Home } from "lucide-react";
+import { Plus, Building2, User, Wrench, Search, CheckCircle2, AlertCircle, X, Check, Home, Edit2, Trash2, ArrowUpDown } from "lucide-react";
 
 type PropertyItem = {
   id: number;
@@ -20,12 +20,15 @@ type PropertyItem = {
   activeOrderCount: number;
   isOccupied: boolean;
   occupancyStatusText: string;
+  createdAt?: string;
 };
 
 export default function AdminPropertiesPage() {
   const [properties, setProperties] = useState<PropertyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [occupancyFilter, setOccupancyFilter] = useState<"all" | "occupied" | "vacant">("all");
+  const [sortBy, setSortBy] = useState<"code" | "name" | "residents_desc" | "residents_asc" | "newest">("code");
 
   // Add Property Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,8 +38,16 @@ export default function AdminPropertiesPage() {
   const [city, setCity] = useState("Missouri City");
   const [state, setState] = useState("TX");
   const [postalCode, setPostalCode] = useState("77489");
-  const [contactEmail, setContactEmail] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
+
+  // Edit Property Modal State
+  const [editingProperty, setEditingProperty] = useState<PropertyItem | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCode, setEditCode] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editCity, setEditCity] = useState("Missouri City");
+  const [editState, setEditState] = useState("TX");
+  const [editPostalCode, setEditPostalCode] = useState("77489");
+  const [editIsActive, setEditIsActive] = useState(true);
 
   const fetchProperties = () => {
     fetch("/api/admin/properties")
@@ -56,15 +67,43 @@ export default function AdminPropertiesPage() {
   }, []);
 
   const filteredProperties = useMemo(() => {
-    const query = searchTerm.toLowerCase();
-    return properties.filter(
-      (p) =>
+    let result = properties.filter((p) => {
+      const query = searchTerm.toLowerCase();
+      const matchesSearch =
         p.name.toLowerCase().includes(query) ||
         (p.code || "").toLowerCase().includes(query) ||
         p.addressLine1.toLowerCase().includes(query) ||
-        p.city.toLowerCase().includes(query)
-    );
-  }, [properties, searchTerm]);
+        p.city.toLowerCase().includes(query);
+
+      if (!matchesSearch) return false;
+
+      if (occupancyFilter === "occupied") return p.isOccupied;
+      if (occupancyFilter === "vacant") return !p.isOccupied;
+      return true;
+    });
+
+    // Sorting logic
+    result.sort((a, b) => {
+      if (sortBy === "code") {
+        return (a.code || "ZZZ").localeCompare(b.code || "ZZZ", undefined, { numeric: true });
+      }
+      if (sortBy === "name") {
+        return a.name.localeCompare(b.name);
+      }
+      if (sortBy === "residents_desc") {
+        return b.residentCount - a.residentCount;
+      }
+      if (sortBy === "residents_asc") {
+        return a.residentCount - b.residentCount;
+      }
+      if (sortBy === "newest") {
+        return b.id - a.id;
+      }
+      return 0;
+    });
+
+    return result;
+  }, [properties, searchTerm, occupancyFilter, sortBy]);
 
   const stats = useMemo(() => {
     const total = properties.length;
@@ -87,8 +126,6 @@ export default function AdminPropertiesPage() {
           city,
           state,
           postalCode,
-          contactEmail,
-          contactPhone,
         }),
       });
 
@@ -97,8 +134,6 @@ export default function AdminPropertiesPage() {
         setCode("");
         setName("");
         setAddressLine1("");
-        setContactEmail("");
-        setContactPhone("");
         fetchProperties();
       } else {
         const err = await res.json();
@@ -106,6 +141,68 @@ export default function AdminPropertiesPage() {
       }
     } catch (err) {
       console.error("Failed to create property:", err);
+    }
+  };
+
+  const startEdit = (prop: PropertyItem) => {
+    setEditingProperty(prop);
+    setEditName(prop.name);
+    setEditCode(prop.code || "");
+    setEditAddress(prop.addressLine1);
+    setEditCity(prop.city);
+    setEditState(prop.state);
+    setEditPostalCode(prop.postalCode);
+    setEditIsActive(prop.isActive);
+  };
+
+  const handleUpdateProperty = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProperty) return;
+    try {
+      const res = await fetch("/api/admin/properties", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingProperty.id,
+          name: editName,
+          code: editCode,
+          addressLine1: editAddress,
+          city: editCity,
+          state: editState,
+          postalCode: editPostalCode,
+          isActive: editIsActive,
+        }),
+      });
+
+      if (res.ok) {
+        setEditingProperty(null);
+        fetchProperties();
+      } else {
+        const err = await res.json();
+        alert(err.error?.message || "Failed to update property");
+      }
+    } catch (err) {
+      console.error("Failed to update property:", err);
+    }
+  };
+
+  const handleDeleteProperty = async (id: number, name: string) => {
+    if (!confirm(`Are you sure you want to delete property "${name}"? Whitelisted residents will be unlinked.`)) return;
+    try {
+      const res = await fetch("/api/admin/properties", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+
+      if (res.ok) {
+        fetchProperties();
+      } else {
+        const err = await res.json();
+        alert(err.error?.message || "Failed to delete property");
+      }
+    } catch (err) {
+      console.error("Failed to delete property:", err);
     }
   };
 
@@ -266,22 +363,168 @@ export default function AdminPropertiesPage() {
         </div>
       )}
 
-      {/* Properties Table */}
+      {/* Edit Property Modal */}
+      {editingProperty && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Edit2 size={16} className="text-blue-600" /> Edit Property Details
+              </h3>
+              <button
+                onClick={() => setEditingProperty(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateProperty} className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Property Name / Title</label>
+                  <input
+                    type="text"
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">P# Code</label>
+                  <input
+                    type="text"
+                    value={editCode}
+                    onChange={(e) => setEditCode(e.target.value.toUpperCase())}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:border-blue-500 uppercase"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Street Address</label>
+                <input
+                  type="text"
+                  required
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">City</label>
+                  <input
+                    type="text"
+                    required
+                    value={editCity}
+                    onChange={(e) => setEditCity(e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">State</label>
+                  <input
+                    type="text"
+                    required
+                    value={editState}
+                    onChange={(e) => setEditState(e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Postal Code</label>
+                  <input
+                    type="text"
+                    required
+                    value={editPostalCode}
+                    onChange={(e) => setEditPostalCode(e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="editIsActive"
+                  checked={editIsActive}
+                  onChange={(e) => setEditIsActive(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="editIsActive" className="text-xs font-semibold text-gray-700 cursor-pointer">
+                  Property Active & Listed
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingProperty(null)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-xs font-medium hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Check size={15} /> Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Properties Table & Filter Header */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-wrap gap-4">
           <div className="flex items-center gap-2">
             <Building2 size={16} className="text-blue-600" />
             <h3 className="text-sm font-semibold text-slate-900">Property Directory ({filteredProperties.length})</h3>
           </div>
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by property name, P# code, or address..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-3 py-1.5 rounded-xl border border-gray-300 text-xs w-80 focus:outline-none focus:border-blue-500"
-            />
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Search */}
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by name, P#, address..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 pr-3 py-1.5 rounded-xl border border-gray-300 text-xs w-64 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Occupancy Filter */}
+            <select
+              value={occupancyFilter}
+              onChange={(e) => setOccupancyFilter(e.target.value as any)}
+              className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none focus:border-blue-500"
+            >
+              <option value="all">All Occupancy</option>
+              <option value="occupied">Occupied Only</option>
+              <option value="vacant">Vacant Only</option>
+            </select>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 px-2.5 py-1 rounded-xl border border-gray-200">
+              <ArrowUpDown size={14} className="text-gray-500" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value="code">Sort: P# Code (A-Z)</option>
+                <option value="name">Sort: Name (A-Z)</option>
+                <option value="residents_desc">Sort: Residents (High → Low)</option>
+                <option value="residents_asc">Sort: Residents (Low → High)</option>
+                <option value="newest">Sort: Date Created</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -293,6 +536,7 @@ export default function AdminPropertiesPage() {
                 <th className="px-6 py-3">Address</th>
                 <th className="px-6 py-3">Occupied / Tenants</th>
                 <th className="px-6 py-3">Occupancy Status & Activity</th>
+                <th className="px-6 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -344,11 +588,29 @@ export default function AdminPropertiesPage() {
                       )}
                     </div>
                   </td>
+                  <td className="px-6 py-3.5 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => startEdit(p)}
+                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer"
+                        title="Edit Property"
+                      >
+                        <Edit2 size={15} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProperty(p.id, p.name)}
+                        className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                        title="Delete Property"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {filteredProperties.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-400 italic">
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-400 italic">
                     No matching properties found.
                   </td>
                 </tr>

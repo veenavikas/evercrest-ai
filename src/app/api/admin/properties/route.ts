@@ -97,3 +97,61 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Failed to create property." } }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== "admin") {
+      return NextResponse.json({ error: { code: "FORBIDDEN", message: "Admin access required" } }, { status: 403 });
+    }
+
+    const { id, name, code, addressLine1, city, state, postalCode, isActive } = await request.json();
+    if (!id) {
+      return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Property ID is required for editing" } }, { status: 400 });
+    }
+
+    const cleanCode = code ? String(code).trim().toUpperCase() : null;
+
+    const [updatedProperty] = await db.update(properties).set({
+      ...(name ? { name } : {}),
+      code: cleanCode,
+      ...(addressLine1 ? { addressLine1 } : {}),
+      ...(city ? { city } : {}),
+      ...(state ? { state } : {}),
+      ...(postalCode ? { postalCode } : {}),
+      ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
+    }).where(eq(properties.id, Number(id))).returning();
+
+    return NextResponse.json({ property: updatedProperty });
+  } catch (error: any) {
+    console.error("Error updating property:", error);
+    return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Failed to update property." } }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== "admin") {
+      return NextResponse.json({ error: { code: "FORBIDDEN", message: "Admin access required" } }, { status: 403 });
+    }
+
+    const { id } = await request.json();
+    if (!id) {
+      return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Property ID is required for deletion" } }, { status: 400 });
+    }
+
+    const propId = Number(id);
+
+    // Unlink allowedEmails & users referencing this property
+    await db.update(allowedEmails).set({ propertyId: null }).where(eq(allowedEmails.propertyId, propId));
+    await db.update(users).set({ propertyId: null }).where(eq(users.propertyId, propId));
+
+    await db.delete(properties).where(eq(properties.id, propId));
+
+    return NextResponse.json({ success: true, message: "Property deleted successfully" });
+  } catch (error: any) {
+    console.error("Error deleting property:", error);
+    return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Failed to delete property." } }, { status: 500 });
+  }
+}
