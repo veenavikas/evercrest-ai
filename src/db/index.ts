@@ -3,12 +3,12 @@ import postgres from "postgres";
 import * as schema from "./schema";
 import { env } from "@/env";
 
-const SUPABASE_DIRECT_URL = "postgresql://postgres:d%24eER45%40dds@db.bejwissofekdfvlzhcwc.supabase.co:5432/postgres?sslmode=require";
+const SUPABASE_IPV4_POOLER_URL = "postgresql://postgres.bejwissofekdfvlzhcwc:d%24eER45%40dds@aws-0-us-west-1.pooler.supabase.com:5432/postgres?sslmode=require";
 
-// Ensure connectionString always points to Direct Supabase Port 5432
-let connectionString = process.env.DATABASE_URL || env.DATABASE_URL || SUPABASE_DIRECT_URL;
-if (!connectionString || connectionString.includes("placeholder") || connectionString.includes("pooler.supabase.com") || connectionString.includes(":6543")) {
-  connectionString = SUPABASE_DIRECT_URL;
+// Ensure connectionString uses IPv4-compatible pooler host on Vercel
+let connectionString = process.env.DATABASE_URL || env.DATABASE_URL || SUPABASE_IPV4_POOLER_URL;
+if (!connectionString || connectionString.includes("placeholder") || connectionString.includes("db.bejwissofekdfvlzhcwc.supabase.co")) {
+  connectionString = SUPABASE_IPV4_POOLER_URL;
 }
 if (connectionString.includes("postgres:d@dds@") || connectionString.includes("d$eER45@dds")) {
   connectionString = connectionString
