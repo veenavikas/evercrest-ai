@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/auth/supabase";
 import { db } from "@/db";
 import { users, allowedEmails } from "@/db/schema";
-import { eq, ilike } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 export async function GET(request: Request) {
@@ -19,10 +19,10 @@ export async function GET(request: Request) {
         const cleanEmail = String(decoded.email).trim().toLowerCase();
 
         // Find or create resident user row
-        let [targetUser] = await db.select().from(users).where(ilike(users.email, cleanEmail));
+        let [targetUser] = await db.select().from(users).where(sql`LOWER(${users.email}) = LOWER(${cleanEmail})`);
 
         if (!targetUser) {
-          const [whitelistRow] = await db.select().from(allowedEmails).where(ilike(allowedEmails.email, cleanEmail));
+          const [whitelistRow] = await db.select().from(allowedEmails).where(sql`LOWER(${allowedEmails.email}) = LOWER(${cleanEmail})`);
           if (whitelistRow) {
             [targetUser] = await db
               .insert(users)
@@ -71,10 +71,10 @@ export async function GET(request: Request) {
 
       if (!error && data?.user?.email) {
         const cleanEmail = data.user.email.trim().toLowerCase();
-        let [targetUser] = await db.select().from(users).where(ilike(users.email, cleanEmail));
+        let [targetUser] = await db.select().from(users).where(sql`LOWER(${users.email}) = LOWER(${cleanEmail})`);
 
         if (!targetUser) {
-          const [whitelistRow] = await db.select().from(allowedEmails).where(ilike(allowedEmails.email, cleanEmail));
+          const [whitelistRow] = await db.select().from(allowedEmails).where(sql`LOWER(${allowedEmails.email}) = LOWER(${cleanEmail})`);
           if (whitelistRow) {
             [targetUser] = await db
               .insert(users)

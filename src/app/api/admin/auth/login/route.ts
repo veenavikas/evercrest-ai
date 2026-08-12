@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, allowedEmails } from "@/db/schema";
-import { eq, or, ilike } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
 import { verifyPassword, hashPassword } from "@/lib/auth/password";
 import { cookies } from "next/headers";
 
@@ -24,8 +24,8 @@ export async function POST(request: Request) {
       .from(users)
       .where(
         or(
-          ilike(users.username, trimmedInput),
-          ilike(users.email, trimmedInput)
+          sql`LOWER(${users.username}) = LOWER(${trimmedInput})`,
+          sql`LOWER(${users.email}) = LOWER(${trimmedInput})`
         )
       );
 
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       const whitelistMatches = await db
         .select()
         .from(allowedEmails)
-        .where(ilike(allowedEmails.email, trimmedInput));
+        .where(sql`LOWER(${allowedEmails.email}) = LOWER(${trimmedInput})`);
 
       const adminWhitelist = whitelistMatches.find((w) => w.role === "admin") || whitelistMatches[0];
 
