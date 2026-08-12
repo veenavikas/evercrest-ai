@@ -14,6 +14,7 @@ const globalForDb = globalThis as unknown as {
 const conn =
   globalForDb.conn ??
   postgres(connectionString, {
+    ssl: "require",
     max: 10,
     idle_timeout: 30,
     connect_timeout: 10,

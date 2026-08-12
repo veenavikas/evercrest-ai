@@ -122,7 +122,6 @@ export async function POST(request: Request) {
     }
 
     // Set Admin Session Cookie
-    const cookieStore = await cookies();
     const sessionPayload = JSON.stringify({
       userId: targetUser.id,
       username: targetUser.username || "admin",
@@ -131,17 +130,9 @@ export async function POST(request: Request) {
       loginTime: Date.now(),
     });
 
-    cookieStore.set("evercrest_admin_session", Buffer.from(sessionPayload).toString("base64"), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-    });
-
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, targetUser.id));
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: {
         id: targetUser.id,
@@ -150,6 +141,16 @@ export async function POST(request: Request) {
         fullName: targetUser.fullName,
       },
     });
+
+    response.cookies.set("evercrest_admin_session", Buffer.from(sessionPayload).toString("base64"), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+
+    return response;
   } catch (error: any) {
     console.error("Error in admin login:", error);
     return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: error?.message || String(error) } }, { status: 500 });
