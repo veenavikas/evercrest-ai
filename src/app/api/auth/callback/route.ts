@@ -19,10 +19,10 @@ export async function GET(request: Request) {
         const cleanEmail = String(decoded.email).trim().toLowerCase();
 
         // Find or create resident user row
-        let [targetUser] = await db.select().from(users).where(eq(sql`LOWER(${users.email})`, cleanEmail));
+        let [targetUser] = await db.select().from(users).where(sql`LOWER(${users.email}) = LOWER(${cleanEmail}::text)`);
 
         if (!targetUser) {
-          const [whitelistRow] = await db.select().from(allowedEmails).where(eq(sql`LOWER(${allowedEmails.email})`, cleanEmail));
+          const [whitelistRow] = await db.select().from(allowedEmails).where(sql`LOWER(${allowedEmails.email}) = LOWER(${cleanEmail}::text)`);
           if (whitelistRow) {
             [targetUser] = await db
               .insert(users)
@@ -42,24 +42,23 @@ export async function GET(request: Request) {
           const sessionPayload = JSON.stringify({
             userId: targetUser.id,
             email: targetUser.email,
-            role: targetUser.role || "tenant",
-            propertyId: targetUser.propertyId || null,
+            role: targetUser.role,
             loginTime: Date.now(),
           });
 
-          cookieStore.set("evercrest_tenant_session", Buffer.from(sessionPayload).toString("base64"), {
+          cookieStore.set("evercrest_session", Buffer.from(sessionPayload).toString("base64"), {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
             path: "/",
-            maxAge: 60 * 60 * 24 * 30, // 30 days
+            maxAge: 60 * 60 * 24 * 7, // 7 days
           });
 
           return NextResponse.redirect(`${origin}${next}`);
         }
       }
-    } catch (err) {
-      console.error("Magic link token verification failed:", err);
+    } catch (tokenErr) {
+      console.error("Failed to decode token:", tokenErr);
     }
   }
 
@@ -71,10 +70,10 @@ export async function GET(request: Request) {
 
       if (!error && data?.user?.email) {
         const cleanEmail = data.user.email.trim().toLowerCase();
-        let [targetUser] = await db.select().from(users).where(eq(sql`LOWER(${users.email})`, cleanEmail));
+        let [targetUser] = await db.select().from(users).where(sql`LOWER(${users.email}) = LOWER(${cleanEmail}::text)`);
 
         if (!targetUser) {
-          const [whitelistRow] = await db.select().from(allowedEmails).where(eq(sql`LOWER(${allowedEmails.email})`, cleanEmail));
+          const [whitelistRow] = await db.select().from(allowedEmails).where(sql`LOWER(${allowedEmails.email}) = LOWER(${cleanEmail}::text)`);
           if (whitelistRow) {
             [targetUser] = await db
               .insert(users)
