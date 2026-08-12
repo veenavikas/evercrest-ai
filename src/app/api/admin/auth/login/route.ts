@@ -150,8 +150,8 @@ export async function POST(request: Request) {
         fullName: targetUser.fullName,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in admin login:", error);
-    return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong" } }, { status: 500 });
+    return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: error?.message || String(error) } }, { status: 500 });
   }
 }
