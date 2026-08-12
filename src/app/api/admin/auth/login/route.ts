@@ -153,6 +153,7 @@ export async function POST(request: Request) {
     return response;
   } catch (error: any) {
     console.error("Error in admin login:", error);
-    return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: error?.message || String(error) } }, { status: 500 });
+    const detailMsg = error?.cause?.message ? `${error.message} (Cause: ${error.cause.message})` : (error?.message || String(error));
+    return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: detailMsg } }, { status: 500 });
   }
 }
