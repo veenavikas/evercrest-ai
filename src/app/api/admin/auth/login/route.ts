@@ -24,8 +24,8 @@ export async function POST(request: Request) {
       .from(users)
       .where(
         or(
-          sql`LOWER(${users.username}) = LOWER(${trimmedInput})`,
-          sql`LOWER(${users.email}) = LOWER(${trimmedInput})`
+          eq(sql`LOWER(${users.username})`, trimmedInput),
+          eq(sql`LOWER(${users.email})`, trimmedInput)
         )
       );
 
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       const whitelistMatches = await db
         .select()
         .from(allowedEmails)
-        .where(sql`LOWER(${allowedEmails.email}) = LOWER(${trimmedInput})`);
+        .where(eq(sql`LOWER(${allowedEmails.email})`, trimmedInput));
 
       const adminWhitelist = whitelistMatches.find((w) => w.role === "admin") || whitelistMatches[0];
 

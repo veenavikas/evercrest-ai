@@ -19,10 +19,10 @@ export async function GET(request: Request) {
         const cleanEmail = String(decoded.email).trim().toLowerCase();
 
         // Find or create resident user row
-        let [targetUser] = await db.select().from(users).where(sql`LOWER(${users.email}) = LOWER(${cleanEmail})`);
+        let [targetUser] = await db.select().from(users).where(eq(sql`LOWER(${users.email})`, cleanEmail));
 
         if (!targetUser) {
-          const [whitelistRow] = await db.select().from(allowedEmails).where(sql`LOWER(${allowedEmails.email}) = LOWER(${cleanEmail})`);
+          const [whitelistRow] = await db.select().from(allowedEmails).where(eq(sql`LOWER(${allowedEmails.email})`, cleanEmail));
           if (whitelistRow) {
             [targetUser] = await db
               .insert(users)
@@ -71,10 +71,10 @@ export async function GET(request: Request) {
 
       if (!error && data?.user?.email) {
         const cleanEmail = data.user.email.trim().toLowerCase();
-        let [targetUser] = await db.select().from(users).where(sql`LOWER(${users.email}) = LOWER(${cleanEmail})`);
+        let [targetUser] = await db.select().from(users).where(eq(sql`LOWER(${users.email})`, cleanEmail));
 
         if (!targetUser) {
-          const [whitelistRow] = await db.select().from(allowedEmails).where(sql`LOWER(${allowedEmails.email}) = LOWER(${cleanEmail})`);
+          const [whitelistRow] = await db.select().from(allowedEmails).where(eq(sql`LOWER(${allowedEmails.email})`, cleanEmail));
           if (whitelistRow) {
             [targetUser] = await db
               .insert(users)

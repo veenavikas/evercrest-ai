@@ -18,8 +18,8 @@ export async function POST(request: Request) {
     const successResponse = NextResponse.json({ message: "If this email is registered, a login link has been sent." });
 
     // 1. Check if email is in allowed_emails or users table
-    const [whitelistEntry] = await db.select().from(allowedEmails).where(sql`LOWER(${allowedEmails.email}) = LOWER(${cleanEmail})`);
-    const [userEntry] = await db.select().from(users).where(sql`LOWER(${users.email}) = LOWER(${cleanEmail})`);
+    const [whitelistEntry] = await db.select().from(allowedEmails).where(eq(sql`LOWER(${allowedEmails.email})`, cleanEmail));
+    const [userEntry] = await db.select().from(users).where(eq(sql`LOWER(${users.email})`, cleanEmail));
 
     if (whitelistEntry || userEntry) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
