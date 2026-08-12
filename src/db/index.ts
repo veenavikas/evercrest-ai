@@ -3,8 +3,13 @@ import postgres from "postgres";
 import * as schema from "./schema";
 import { env } from "@/env";
 
+const SUPABASE_FALLBACK_URL = "postgresql://postgres:d%24eER45%40dds@db.bejwissofekdfvlzhcwc.supabase.co:5432/postgres?sslmode=require";
+
 // Ensure process.env.DATABASE_URL is prioritized and properly percent-encoded for Vercel
-let connectionString = process.env.DATABASE_URL || env.DATABASE_URL || "";
+let connectionString = process.env.DATABASE_URL || env.DATABASE_URL || SUPABASE_FALLBACK_URL;
+if (!connectionString || connectionString.includes("placeholder")) {
+  connectionString = SUPABASE_FALLBACK_URL;
+}
 if (connectionString.includes("postgres:d@dds@") || connectionString.includes("d$eER45@dds")) {
   connectionString = connectionString
     .replace("postgres:d@dds@", "postgres:d%24eER45%40dds@")
