@@ -48,11 +48,22 @@ export default function WhitelistPage() {
 
   const fetchData = () => {
     Promise.all([
-      fetch("/api/admin/allowed-emails").then((res) => res.json()),
-      fetch("/api/admin/properties").then((res) => res.json()),
+      fetch("/api/admin/allowed-emails").then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      }),
+      fetch("/api/admin/properties").then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      }),
     ])
       .then(([allowedData, propsData]) => {
-        if (allowedData.allowedEmails) setEntries(allowedData.allowedEmails);
+        if (allowedData.allowedEmails) {
+          const uniqueEntries = Array.from(
+            new Map(allowedData.allowedEmails.map((e: WhitelistEntry) => [e.id, e])).values()
+          ) as WhitelistEntry[];
+          setEntries(uniqueEntries);
+        }
         if (propsData.properties) setPropertiesList(propsData.properties);
         setLoading(false);
       })

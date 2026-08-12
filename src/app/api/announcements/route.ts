@@ -7,17 +7,20 @@ import { getSession } from "@/lib/auth/session";
 export async function GET(request: Request) {
   try {
     const session = await getSession();
-    if (!session || session.role !== "tenant" || !session.propertyId) {
-      return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Unauthorized or property missing" } }, { status: 401 });
+    if (!session || session.role !== "tenant") {
+      return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Unauthorized" } }, { status: 401 });
     }
 
     const now = new Date();
 
-    const results = await db.select()
+    const results = await db
+      .select()
       .from(announcements)
       .where(
         and(
-          eq(announcements.propertyId, session.propertyId),
+          session.propertyId
+            ? or(eq(announcements.propertyId, session.propertyId), isNull(announcements.propertyId))
+            : isNull(announcements.propertyId),
           or(isNull(announcements.expiresAt), gt(announcements.expiresAt, now))
         )
       )

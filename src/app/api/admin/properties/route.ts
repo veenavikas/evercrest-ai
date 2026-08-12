@@ -13,43 +13,68 @@ export async function GET() {
 
     const allProps = await db.select().from(properties);
 
-    // Compute tenant count & active work order count per property
-    const enrichedProperties = await Promise.all(
-      allProps.map(async (prop) => {
-        // Count whitelisted tenants
-        const [tenantRes] = await db
-          .select({ count: count() })
-          .from(allowedEmails)
-          .where(
-            prop.code
-              ? sql`${allowedEmails.propertyId} = ${prop.id} OR ${allowedEmails.propertyCode} = ${prop.code}`
-              : eq(allowedEmails.propertyId, prop.id)
-          );
-
-        // Count open work orders
-        const [workOrderRes] = await db
-          .select({ count: count() })
-          .from(workOrders)
-          .where(eq(workOrders.propertyId, prop.id));
-
-        const residentCount = tenantRes?.count || 0;
-        const activeOrderCount = workOrderRes?.count || 0;
-        const isOccupied = residentCount > 0;
-
-        let statusText = isOccupied ? `Occupied (${residentCount} Resident${residentCount > 1 ? "s" : ""})` : "Vacant";
-        if (activeOrderCount > 0) {
-          statusText += ` • ${activeOrderCount} Active Work Order${activeOrderCount > 1 ? "s" : ""}`;
-        }
-
-        return {
-          ...prop,
-          residentCount,
-          activeOrderCount,
-          isOccupied,
-          occupancyStatusText: statusText,
-        };
+    // Fetch tenant counts per propertyId / propertyCode in 1 query
+    const tenantCountsRaw = await db
+      .select({
+        propertyId: allowedEmails.propertyId,
+        propertyCode: allowedEmails.propertyCode,
+        count: count(),
       })
-    );
+      .from(allowedEmails)
+      .groupBy(allowedEmails.propertyId, allowedEmails.propertyCode);
+
+    // Fetch work order counts per propertyId in 1 query
+    const workOrderCountsRaw = await db
+      .select({
+        propertyId: workOrders.propertyId,
+        count: count(),
+      })
+      .from(workOrders)
+      .groupBy(workOrders.propertyId);
+
+    // Build lookup maps
+    const tenantCountByPropId = new Map<number, number>();
+    const tenantCountByCode = new Map<string, number>();
+
+    for (const item of tenantCountsRaw) {
+      const c = Number(item.count || 0);
+      if (item.propertyId) {
+        tenantCountByPropId.set(item.propertyId, (tenantCountByPropId.get(item.propertyId) || 0) + c);
+      }
+      if (item.propertyCode) {
+        tenantCountByCode.set(item.propertyCode, (tenantCountByCode.get(item.propertyCode) || 0) + c);
+      }
+    }
+
+    const workOrderCountMap = new Map<number, number>();
+    for (const item of workOrderCountsRaw) {
+      if (item.propertyId) {
+        workOrderCountMap.set(item.propertyId, Number(item.count || 0));
+      }
+    }
+
+    const enrichedProperties = allProps.map((prop) => {
+      let residentCount = tenantCountByPropId.get(prop.id) || 0;
+      if (prop.code && tenantCountByCode.has(prop.code)) {
+        residentCount = Math.max(residentCount, tenantCountByCode.get(prop.code) || 0);
+      }
+
+      const activeOrderCount = workOrderCountMap.get(prop.id) || 0;
+      const isOccupied = residentCount > 0;
+
+      let statusText = isOccupied ? `Occupied (${residentCount} Resident${residentCount > 1 ? "s" : ""})` : "Vacant";
+      if (activeOrderCount > 0) {
+        statusText += ` • ${activeOrderCount} Active Work Order${activeOrderCount > 1 ? "s" : ""}`;
+      }
+
+      return {
+        ...prop,
+        residentCount,
+        activeOrderCount,
+        isOccupied,
+        occupancyStatusText: statusText,
+      };
+    });
 
     return NextResponse.json({ properties: enrichedProperties });
   } catch (error) {
@@ -105,7 +130,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: { code: "FORBIDDEN", message: "Admin access required" } }, { status: 403 });
     }
 
-    const { id, name, code, addressLine1, city, state, postalCode, isActive } = await request.json();
+    const { id, name, code, addressLine1, city, state, postalCode, contactEmail, contactPhone, description, isActive } = await request.json();
     if (!id) {
       return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Property ID is required for editing" } }, { status: 400 });
     }
@@ -119,6 +144,9 @@ export async function PATCH(request: Request) {
       ...(city ? { city } : {}),
       ...(state ? { state } : {}),
       ...(postalCode ? { postalCode } : {}),
+      ...(contactEmail !== undefined ? { contactEmail: contactEmail ? String(contactEmail).trim() : null } : {}),
+      ...(contactPhone !== undefined ? { contactPhone: contactPhone ? String(contactPhone).trim() : null } : {}),
+      ...(description !== undefined ? { description: description ? String(description).trim() : null } : {}),
       ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
     }).where(eq(properties.id, Number(id))).returning();
 

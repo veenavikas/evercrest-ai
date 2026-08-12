@@ -24,8 +24,9 @@ export async function sendEmail(params: {
 
     try {
       // 2. Attempt resend.emails.send(...)
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
       const { data, error } = await resend.emails.send({
-        from: `Evercrest Maintenance <${process.env.RESEND_FROM_EMAIL || 'noreply@yourdomain.com'}>`,
+        from: `CrestFix Maintenance <${fromEmail}>`,
         to,
         subject: params.subject,
         html: params.html,

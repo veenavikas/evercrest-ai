@@ -13,6 +13,7 @@ type PropertyItem = {
   city: string;
   state: string;
   postalCode: string;
+  description?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
   isActive: boolean;
@@ -38,6 +39,9 @@ export default function AdminPropertiesPage() {
   const [city, setCity] = useState("Missouri City");
   const [state, setState] = useState("TX");
   const [postalCode, setPostalCode] = useState("77489");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [description, setDescription] = useState("");
 
   // Edit Property Modal State
   const [editingProperty, setEditingProperty] = useState<PropertyItem | null>(null);
@@ -47,6 +51,9 @@ export default function AdminPropertiesPage() {
   const [editCity, setEditCity] = useState("Missouri City");
   const [editState, setEditState] = useState("TX");
   const [editPostalCode, setEditPostalCode] = useState("77489");
+  const [editContactPhone, setEditContactPhone] = useState("");
+  const [editContactEmail, setEditContactEmail] = useState("");
+  const [editDescription, setEditDescription] = useState("");
   const [editIsActive, setEditIsActive] = useState(true);
 
   const fetchProperties = () => {
@@ -120,12 +127,15 @@ export default function AdminPropertiesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          code,
           name: name || addressLine1,
+          code: code ? code.trim().toUpperCase() : null,
           addressLine1,
           city,
           state,
           postalCode,
+          contactPhone: contactPhone ? contactPhone.trim() : null,
+          contactEmail: contactEmail ? contactEmail.trim() : null,
+          description: description ? description.trim() : null,
         }),
       });
 
@@ -134,6 +144,9 @@ export default function AdminPropertiesPage() {
         setCode("");
         setName("");
         setAddressLine1("");
+        setContactPhone("");
+        setContactEmail("");
+        setDescription("");
         fetchProperties();
       } else {
         const err = await res.json();
@@ -152,6 +165,9 @@ export default function AdminPropertiesPage() {
     setEditCity(prop.city);
     setEditState(prop.state);
     setEditPostalCode(prop.postalCode);
+    setEditContactPhone(prop.contactPhone || "");
+    setEditContactEmail(prop.contactEmail || "");
+    setEditDescription(prop.description || "");
     setEditIsActive(prop.isActive);
   };
 
@@ -170,6 +186,9 @@ export default function AdminPropertiesPage() {
           city: editCity,
           state: editState,
           postalCode: editPostalCode,
+          contactPhone: editContactPhone,
+          contactEmail: editContactEmail,
+          description: editDescription,
           isActive: editIsActive,
         }),
       });
@@ -343,6 +362,40 @@ export default function AdminPropertiesPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Contact / Hotline Phone</label>
+                  <input
+                    type="text"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="e.g. (800) 555-0199"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Contact Email</label>
+                  <input
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder="e.g. support@evercrest.com"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Property Amenities & Description</label>
+                <textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g. Pool, 24/7 Fitness Center, Package Lockers, Clubhouse Lounge, Gated Access"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
               <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
                 <button
                   type="button"
@@ -443,6 +496,40 @@ export default function AdminPropertiesPage() {
                     className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Contact / Emergency Phone</label>
+                  <input
+                    type="text"
+                    value={editContactPhone}
+                    onChange={(e) => setEditContactPhone(e.target.value)}
+                    placeholder="e.g. (800) 555-0199"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Contact Email</label>
+                  <input
+                    type="email"
+                    value={editContactEmail}
+                    onChange={(e) => setEditContactEmail(e.target.value)}
+                    placeholder="e.g. support@evercrest.com"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Property Amenities & Description</label>
+                <textarea
+                  rows={2}
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="e.g. Pool, Fitness Center, Package Lockers, Clubhouse Lounge, Gated Access"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                />
               </div>
 
               <div className="flex items-center gap-2">

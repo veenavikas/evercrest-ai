@@ -11,7 +11,8 @@ export async function GET() {
       return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Unauthorized" } }, { status: 401 });
     }
 
-    const results = await db.select()
+    const results = await db
+      .select()
       .from(workOrders)
       .where(eq(workOrders.tenantId, session.userId))
       .orderBy(desc(workOrders.createdAt));

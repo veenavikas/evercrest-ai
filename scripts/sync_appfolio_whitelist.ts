@@ -1,13 +1,25 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import { eq, sql } from "drizzle-orm";
-import postgres from "postgres";
-import * as schema from "../src/db/schema";
-import XLSX from "xlsx";
+import fs from "fs";
 import path from "path";
+import postgres from "postgres";
+import XLSX from "xlsx";
+
+if (!process.env.DATABASE_URL) {
+  const envPath = path.resolve(process.cwd(), ".env.local");
+  if (fs.existsSync(envPath)) {
+    const envConfig = fs.readFileSync(envPath, "utf8");
+    for (const line of envConfig.split("\n")) {
+      const match = line.match(/^([^=]+)=(.*)$/);
+      if (match) {
+        const key = match[1].trim();
+        const value = match[2].trim().replace(/^["']|["']$/g, "");
+        process.env[key] = value;
+      }
+    }
+  }
+}
 
 const connectionString = process.env.DATABASE_URL || "postgres://dsnaidu@localhost:5432/evercrest";
-const client = postgres(connectionString);
-const db = drizzle(client, { schema });
+const client = postgres(connectionString, { ssl: "require", prepare: false, max: 1 });
 
 type TenantRow = {
   pNum: string;
@@ -58,95 +70,77 @@ async function main() {
 
   console.log(`Extracted ${parsedTenants.length} tenant email entries from Excel.`);
 
-  // 1. Group by unique Property Address & insert/update properties with P# code
+  // 1. Unique Properties
   const propertyMap = new Map<string, number>();
 
   for (const tenant of parsedTenants) {
     if (!tenant.address) continue;
+    if (propertyMap.has(tenant.address)) continue;
+
+    const parts = tenant.address.split(",");
+    const addressLine1 = parts[0]?.trim() || tenant.address;
+    const city = parts[1]?.trim() || "Missouri City";
+    const stateZip = parts[2]?.trim() || "TX 77489";
+    const stateZipParts = stateZip.split(" ");
+    const state = stateZipParts[0] || "TX";
+    const postalCode = stateZipParts[1] || "77489";
+    const slug = tenant.address.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+    const existingProps = await client`SELECT id FROM "properties" WHERE "address_line1" = ${addressLine1} LIMIT 1`;
     
-    if (!propertyMap.has(tenant.address)) {
-      const parts = tenant.address.split(",");
-      const addressLine1 = parts[0]?.trim() || tenant.address;
-      const city = parts[1]?.trim() || "Missouri City";
-      const stateZip = parts[2]?.trim() || "TX 77489";
-      const stateZipParts = stateZip.split(" ");
-      const state = stateZipParts[0] || "TX";
-      const postalCode = stateZipParts[1] || "77489";
-
-      const [existingProp] = await db.select().from(schema.properties).where(eq(schema.properties.addressLine1, addressLine1));
-      
-      let propId: number;
-      if (existingProp) {
-        propId = existingProp.id;
-        if (tenant.pNum) {
-          await db.update(schema.properties).set({ code: tenant.pNum }).where(eq(schema.properties.id, propId));
-        }
-      } else {
-        const [newProp] = await db.insert(schema.properties).values({
-          name: tenant.address,
-          code: tenant.pNum,
-          slug: tenant.address.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
-          addressLine1,
-          city,
-          state,
-          postalCode,
-          description: `Residential property ${tenant.pNum}`,
-          contactEmail: tenant.email,
-          contactPhone: tenant.phone || "555-0199",
-          isActive: true,
-        }).returning();
-        propId = newProp.id;
+    let propId: number;
+    if (existingProps.length > 0) {
+      propId = existingProps[0].id;
+      if (tenant.pNum) {
+        await client`UPDATE "properties" SET "code" = ${tenant.pNum} WHERE "id" = ${propId}`;
       }
-
-      propertyMap.set(tenant.address, propId);
+    } else {
+      const inserted = await client`
+        INSERT INTO "properties" ("name", "code", "slug", "address_line1", "city", "state", "postal_code", "description", "contact_email", "contact_phone", "is_active")
+        VALUES (${tenant.address}, ${tenant.pNum}, ${slug}, ${addressLine1}, ${city}, ${state}, ${postalCode}, ${`Residential property ${tenant.pNum}`}, ${tenant.email}, ${tenant.phone || "555-0199"}, true)
+        RETURNING id
+      `;
+      propId = inserted[0].id;
     }
+    propertyMap.set(tenant.address, propId);
   }
 
   console.log(`Processed ${propertyMap.size} properties in DB.`);
 
-  // 2. Insert into allowed_emails & users tables
+  // 2. Batch Upsert Allowed Emails & Tenant Users
   let insertedWhitelist = 0;
   let insertedUsers = 0;
 
   for (const tenant of parsedTenants) {
     const propId = propertyMap.get(tenant.address) ?? null;
+    const username = tenant.email.split("@")[0];
 
-    const [existingAllowed] = await db.select().from(schema.allowedEmails).where(eq(schema.allowedEmails.email, tenant.email));
-    if (!existingAllowed) {
-      await db.insert(schema.allowedEmails).values({
-        email: tenant.email,
-        role: "tenant",
-        propertyId: propId,
-        propertyCode: tenant.pNum,
-      });
-      insertedWhitelist++;
-    } else {
-      await db.update(schema.allowedEmails).set({
-        propertyId: propId,
-        propertyCode: tenant.pNum,
-        role: "tenant",
-      }).where(eq(schema.allowedEmails.email, tenant.email));
-    }
+    // Allowed Emails Upsert
+    const resAllowed = await client`
+      INSERT INTO "allowed_emails" ("email", "role", "property_id", "property_code")
+      VALUES (${tenant.email}, 'tenant', ${propId}, ${tenant.pNum})
+      ON CONFLICT ("email") DO UPDATE SET
+        "property_id" = EXCLUDED."property_id",
+        "property_code" = EXCLUDED."property_code",
+        "role" = 'tenant'
+      RETURNING id
+    `;
+    if (resAllowed.length > 0) insertedWhitelist++;
 
-    const [existingUser] = await db.select().from(schema.users).where(eq(schema.users.email, tenant.email));
-    if (!existingUser) {
-      await db.insert(schema.users).values({
-        username: tenant.email.split("@")[0],
-        email: tenant.email,
-        fullName: tenant.name,
-        role: "tenant",
-        propertyId: propId,
-      });
-      insertedUsers++;
-    } else {
-      await db.update(schema.users).set({
-        fullName: tenant.name,
-        propertyId: propId,
-      }).where(eq(schema.users.email, tenant.email));
-    }
+    // Tenant Users Upsert
+    const resUsers = await client`
+      INSERT INTO "users" ("username", "email", "full_name", "role", "property_id")
+      VALUES (${username}, ${tenant.email}, ${tenant.name}, 'tenant', ${propId})
+      ON CONFLICT ("email") DO UPDATE SET
+        "full_name" = EXCLUDED."full_name",
+        "property_id" = EXCLUDED."property_id"
+      RETURNING id
+    `;
+    if (resUsers.length > 0) insertedUsers++;
   }
 
-  console.log(`Successfully synced whitelist!\n- Whitelist entries processed: ${parsedTenants.length}\n- New whitelist entries created: ${insertedWhitelist}\n- New tenant users created: ${insertedUsers}`);
+  console.log(`Successfully synced whitelist!\n- Whitelist entries processed: ${parsedTenants.length}\n- Whitelist entries synced: ${insertedWhitelist}\n- Tenant users synced: ${insertedUsers}`);
+  await client.end();
   process.exit(0);
 }
 

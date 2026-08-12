@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { allowedEmails, users, properties, systemLogs } from "@/db/schema";
-import { eq, desc, ilike } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { sendEmail } from "@/lib/email/mailer";
 
@@ -12,32 +12,42 @@ export async function GET() {
       return NextResponse.json({ error: { code: "FORBIDDEN", message: "Admin access required" } }, { status: 403 });
     }
 
-    const rows = await db
-      .select({
-        id: allowedEmails.id,
-        email: allowedEmails.email,
-        role: allowedEmails.role,
-        propertyId: allowedEmails.propertyId,
-        propertyCode: allowedEmails.propertyCode,
-        createdAt: allowedEmails.createdAt,
-        addedBy: allowedEmails.addedBy,
-        propertyName: properties.name,
-        propertyCodeFromTable: properties.code,
-      })
-      .from(allowedEmails)
-      .leftJoin(properties, eq(allowedEmails.propertyId, properties.id))
-      .orderBy(desc(allowedEmails.createdAt));
+    const [allEmails, allProps] = await Promise.all([
+      db.select().from(allowedEmails).orderBy(desc(allowedEmails.createdAt)),
+      db.select().from(properties),
+    ]);
 
-    const result = rows.map((r) => ({
-      id: r.id,
-      email: r.email,
-      role: r.role || "tenant",
-      propertyId: r.propertyId,
-      propertyCode: r.propertyCode || r.propertyCodeFromTable || null,
-      propertyName: r.propertyName || null,
-      createdAt: r.createdAt,
-      addedBy: r.addedBy,
-    }));
+    const propByIdMap = new Map(allProps.map((p) => [p.id, p]));
+    const propByCodeMap = new Map(
+      allProps.filter((p) => p.code).map((p) => [p.code!.toUpperCase(), p])
+    );
+
+    const result = allEmails.map((r) => {
+      let prop = r.propertyId ? propByIdMap.get(r.propertyId) : undefined;
+      if (!prop && r.propertyCode) {
+        prop = propByCodeMap.get(r.propertyCode.toUpperCase());
+      }
+
+      const code = r.propertyCode || prop?.code || null;
+      let address = prop?.name || prop?.addressLine1 || null;
+      if (address && prop?.city) {
+        address = `${address}, ${prop.city}${prop.state ? `, ${prop.state}` : ""}`;
+      }
+
+      return {
+        id: r.id,
+        email: r.email,
+        role: r.role || "tenant",
+        propertyId: r.propertyId || prop?.id || null,
+        propertyCode: code,
+        propertyName: prop?.name || null,
+        propertyAddress: address,
+        city: prop?.city || null,
+        state: prop?.state || null,
+        createdAt: r.createdAt,
+        addedBy: r.addedBy,
+      };
+    });
 
     return NextResponse.json({ allowedEmails: result });
   } catch (error) {
@@ -74,7 +84,10 @@ export async function POST(request: Request) {
     }
 
     if (!validPropertyId && cleanCode) {
-      const [propByCode] = await db.select().from(properties).where(ilike(properties.code, cleanCode));
+      const [propByCode] = await db
+        .select()
+        .from(properties)
+        .where(sql`LOWER(${properties.code}) = LOWER(${cleanCode})`);
       if (propByCode) {
         validPropertyId = propByCode.id;
       }
@@ -89,16 +102,35 @@ export async function POST(request: Request) {
       }
     }
 
-    const [entry] = await db
-      .insert(allowedEmails)
-      .values({
-        email: cleanEmail,
-        role: "tenant",
-        propertyId: validPropertyId,
-        propertyCode: cleanCode,
-        addedBy: validActorId,
-      })
-      .returning();
+    // Check if email already exists in whitelist
+    const [existingAllowed] = await db
+      .select()
+      .from(allowedEmails)
+      .where(sql`LOWER(${allowedEmails.email}) = LOWER(${cleanEmail})`);
+
+    let entry;
+    if (existingAllowed) {
+      [entry] = await db
+        .update(allowedEmails)
+        .set({
+          propertyId: validPropertyId,
+          propertyCode: cleanCode,
+          role: "tenant",
+        })
+        .where(eq(allowedEmails.id, existingAllowed.id))
+        .returning();
+    } else {
+      [entry] = await db
+        .insert(allowedEmails)
+        .values({
+          email: cleanEmail,
+          role: "tenant",
+          propertyId: validPropertyId,
+          propertyCode: cleanCode,
+          addedBy: validActorId,
+        })
+        .returning();
+    }
 
     const [existingUser] = await db.select().from(users).where(eq(users.email, cleanEmail));
     if (!existingUser) {
@@ -117,7 +149,7 @@ export async function POST(request: Request) {
       await db.insert(systemLogs).values({
         eventType: "admin.whitelist_updated",
         actorUserId: validActorId,
-        metadata: { action: "added", email: cleanEmail, propertyCode: cleanCode },
+        metadata: { action: existingAllowed ? "updated" : "added", email: cleanEmail, propertyCode: cleanCode },
       });
     } catch (logErr) {
       console.warn("Writing system log skipped:", logErr);
@@ -126,14 +158,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ entry });
   } catch (error: any) {
     console.error("Error adding to whitelist:", error);
-    if (
-      error?.message?.includes("UNIQUE constraint failed") ||
-      error?.message?.includes("duplicate key") ||
-      error?.code === "23505"
-    ) {
-      return NextResponse.json({ error: { code: "CONFLICT", message: "Email is already in the whitelist" } }, { status: 409 });
+    const isDuplicate =
+      error?.code === "23505" ||
+      error?.cause?.code === "23505" ||
+      String(error?.message).includes("duplicate key") ||
+      String(error?.message).includes("allowed_emails_email_unique");
+
+    if (isDuplicate) {
+      return NextResponse.json(
+        { error: { code: "CONFLICT", message: "This email address is already in the resident whitelist." } },
+        { status: 409 }
+      );
     }
-    return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: error?.message || "Failed to add email to whitelist." } }, { status: 500 });
+    return NextResponse.json(
+      { error: { code: "INTERNAL_ERROR", message: "Failed to add email to whitelist. Please check property details." } },
+      { status: 500 }
+    );
   }
 }
 
@@ -163,7 +203,10 @@ export async function PATCH(request: Request) {
     }
 
     if (!validPropertyId && cleanCode) {
-      const [propByCode] = await db.select().from(properties).where(ilike(properties.code, cleanCode));
+      const [propByCode] = await db
+        .select()
+        .from(properties)
+        .where(sql`LOWER(${properties.code}) = LOWER(${cleanCode})`);
       if (propByCode) {
         validPropertyId = propByCode.id;
       }

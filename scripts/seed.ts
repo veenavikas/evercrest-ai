@@ -1,11 +1,28 @@
+import fs from "fs";
+import path from "path";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, sql } from "drizzle-orm";
 import postgres from "postgres";
 import * as schema from "../src/db/schema";
 import { hashPassword } from "../src/lib/auth/password";
 
+if (!process.env.DATABASE_URL) {
+  const envPath = path.resolve(process.cwd(), ".env.local");
+  if (fs.existsSync(envPath)) {
+    const envConfig = fs.readFileSync(envPath, "utf8");
+    for (const line of envConfig.split("\n")) {
+      const match = line.match(/^([^=]+)=(.*)$/);
+      if (match) {
+        const key = match[1].trim();
+        const value = match[2].trim().replace(/^["']|["']$/g, "");
+        process.env[key] = value;
+      }
+    }
+  }
+}
+
 const connectionString = process.env.DATABASE_URL || "postgres://dsnaidu@localhost:5432/evercrest";
-const client = postgres(connectionString);
+const client = postgres(connectionString, { ssl: "require", prepare: false });
 const db = drizzle(client, { schema });
 
 async function main() {
@@ -90,6 +107,87 @@ async function main() {
       role: "admin",
       passwordHash: hashedPassword,
     }).where(eq(schema.users.id, existingAdminUser.id));
+  }
+
+  // 4. Seed all Appfolio properties & whitelist entries from Excel
+  console.log("Seeding Appfolio properties & whitelist entries from Excel into Supabase...");
+  const excelPath = path.resolve(process.cwd(), "Appfolio email table_1.xlsx");
+  if (fs.existsSync(excelPath)) {
+    try {
+      const XLSX = require("xlsx");
+      const wb = XLSX.readFile(excelPath);
+      const rawData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+
+      const tenants: any[] = [];
+      rawData.forEach((row: any) => {
+        const pNum = String(row["P#"] || "").trim();
+        const address = String(row["Property Address"] || "").trim();
+        [1, 2, 3, 4, 5].forEach((tNum) => {
+          const email = String(row[`Tenant ${tNum} Email`] || "").trim().toLowerCase();
+          const name = String(row[`Tenant ${tNum} Name`] || "").trim() || "Whitelisted Resident";
+          const phone = String(row[`Tenant ${tNum} Phone`] || "").trim();
+          if (email && email.includes("@")) {
+            email.split("|").forEach((e) => {
+              const clean = e.trim().toLowerCase();
+              if (clean && clean.includes("@")) {
+                tenants.push({ pNum, address, name, phone, email: clean });
+              }
+            });
+          }
+        });
+      });
+
+      const propMap = new Map();
+      for (const t of tenants) {
+        if (!t.address || propMap.has(t.address)) continue;
+        const parts = t.address.split(",");
+        const addressLine1 = parts[0]?.trim() || t.address;
+        const city = parts[1]?.trim() || "Missouri City";
+        const stateZip = parts[2]?.trim() || "TX 77489";
+        const stateZipParts = stateZip.split(" ");
+        const state = stateZipParts[0] || "TX";
+        const postalCode = stateZipParts[1] || "77489";
+        const slug = t.address.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+        const existing = await client`SELECT id FROM "properties" WHERE "address_line1" = ${addressLine1} LIMIT 1`;
+        let id;
+        if (existing.length > 0) {
+          id = existing[0].id;
+          if (t.pNum) await client`UPDATE "properties" SET "code" = ${t.pNum} WHERE id = ${id}`;
+        } else {
+          const ins = await client`
+            INSERT INTO "properties" ("name", "code", "slug", "address_line1", "city", "state", "postal_code", "description", "contact_email", "contact_phone", "is_active")
+            VALUES (${t.address}, ${t.pNum}, ${slug}, ${addressLine1}, ${city}, ${state}, ${postalCode}, ${`Property ${t.pNum}`}, ${t.email}, ${t.phone || "555-0199"}, true)
+            RETURNING id
+          `;
+          id = ins[0].id;
+        }
+        propMap.set(t.address, id);
+      }
+
+      for (const t of tenants) {
+        const propId = propMap.get(t.address) || null;
+        await client`
+          INSERT INTO "allowed_emails" ("email", "role", "property_id", "property_code")
+          VALUES (${t.email}, 'tenant', ${propId}, ${t.pNum})
+          ON CONFLICT ("email") DO UPDATE SET
+            "property_id" = EXCLUDED."property_id",
+            "property_code" = EXCLUDED."property_code"
+        `;
+
+        const username = t.email.split("@")[0];
+        await client`
+          INSERT INTO "users" ("username", "email", "full_name", "role", "property_id")
+          VALUES (${username}, ${t.email}, ${t.name}, 'tenant', ${propId})
+          ON CONFLICT ("email") DO UPDATE SET
+            "full_name" = EXCLUDED."full_name",
+            "property_id" = EXCLUDED."property_id"
+        `;
+      }
+      console.log(`Synced ${propMap.size} properties and ${tenants.length} whitelist emails into Supabase.`);
+    } catch (excelErr) {
+      console.warn("Skipping Appfolio Excel sync during seed:", excelErr);
+    }
   }
 
   console.log("Database migration & seeding completed successfully!");
