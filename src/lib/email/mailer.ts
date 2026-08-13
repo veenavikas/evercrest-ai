@@ -24,9 +24,14 @@ export async function sendEmail(params: {
 
     try {
       // 2. Attempt resend.emails.send(...)
-      const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+      let rawFrom = (process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev").trim();
+      rawFrom = rawFrom.replace(/^["']|["']$/g, "");
+      const emailMatch = rawFrom.match(/<([^>]+)>/);
+      const cleanFromEmail = emailMatch ? emailMatch[1].trim() : rawFrom.replace(/.*<|>.*/g, "").trim();
+      const formattedFrom = `CrestFix Maintenance <${cleanFromEmail || "onboarding@resend.dev"}>`;
+
       const { data, error } = await resend.emails.send({
-        from: `CrestFix Maintenance <${fromEmail}>`,
+        from: formattedFrom,
         to,
         subject: params.subject,
         html: params.html,
@@ -49,7 +54,7 @@ export async function sendEmail(params: {
         .where(eq(emailLogs.id, log.id));
         
       console.error(`Failed to send email to ${to}:`, errorMessage);
-      // We don't throw error to prevent blocking work order creation
+      throw error;
     }
   }
 }
