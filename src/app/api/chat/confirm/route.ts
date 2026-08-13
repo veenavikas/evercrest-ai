@@ -43,7 +43,13 @@ export async function POST(request: Request) {
       })
       .returning();
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+    const proto = request.headers.get("x-forwarded-proto") || "https";
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes("localhost"))
+      ? process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")
+      : (host && !host.includes("localhost"))
+        ? `${proto}://${host}`
+        : (process.env.NEXT_PUBLIC_APP_URL || "https://evercrest-ai.vercel.app");
 
     // 1. Dispatch Confirmation Email to Resident
     if (session.email) {
