@@ -124,25 +124,27 @@ export async function POST(request: Request) {
 </html>
       `;
 
-      sendEmail({
-        to: cleanEmail,
-        subject: "✨ Your CrestFix Magic Link to AI Chat Bot",
-        html: htmlBody,
-        template: "magic_link_chat",
-      }).catch((err) => console.error("Failed sending magic link email:", err));
-
-      // 4. Also trigger Supabase OTP as fallback
       try {
-        const supabase = await createClient();
-        await supabase.auth.signInWithOtp({
-          email: cleanEmail,
-          options: {
-            shouldCreateUser: true,
-            emailRedirectTo: `${appUrl}/api/auth/callback?next=/chat`,
-          },
+        await sendEmail({
+          to: cleanEmail,
+          subject: "✨ Your CrestFix Magic Link to AI Chat Bot",
+          html: htmlBody,
+          template: "magic_link_chat",
         });
-      } catch (err) {
-        console.warn("Supabase OTP fallback skipped:", err);
+      } catch (resendErr) {
+        console.warn("Resend email dispatch failed, trying Supabase OTP fallback:", resendErr);
+        try {
+          const supabase = await createClient();
+          await supabase.auth.signInWithOtp({
+            email: cleanEmail,
+            options: {
+              shouldCreateUser: true,
+              emailRedirectTo: `${appUrl}/api/auth/callback?next=/chat`,
+            },
+          });
+        } catch (otpErr) {
+          console.error("Supabase OTP fallback also failed:", otpErr);
+        }
       }
     }
 

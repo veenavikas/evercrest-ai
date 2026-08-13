@@ -46,12 +46,20 @@ export async function GET(request: Request) {
             loginTime: Date.now(),
           });
 
+          cookieStore.set("evercrest_tenant_session", Buffer.from(sessionPayload).toString("base64"), {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            path: "/",
+            maxAge: 60 * 60 * 24 * 30, // 30 days
+          });
+
           cookieStore.set("evercrest_session", Buffer.from(sessionPayload).toString("base64"), {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
             path: "/",
-            maxAge: 60 * 60 * 24 * 7, // 7 days
+            maxAge: 60 * 60 * 24 * 30,
           });
 
           return NextResponse.redirect(`${origin}${next}`);

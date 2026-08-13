@@ -82,11 +82,36 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Tenant / Standard User Path — refresh session & get user
-  const { supabaseResponse, supabase } = await updateSession(request);
-  const { data: { user } } = await supabase.auth.getUser();
+  // Tenant / Standard User Path — check tenant session cookie OR Supabase auth session
+  const tenantCookie = request.cookies.get('evercrest_tenant_session') || request.cookies.get('evercrest_session');
+  let hasValidTenant = false;
+  let tenantEmail: string | null = null;
+  let user: any = null;
 
-  if (!user) {
+  if (tenantCookie?.value) {
+    try {
+      const decoded = JSON.parse(Buffer.from(tenantCookie.value, 'base64').toString('utf-8'));
+      if (decoded.userId || decoded.email) {
+        hasValidTenant = true;
+        tenantEmail = decoded.email || null;
+      }
+    } catch (e) {
+      hasValidTenant = false;
+    }
+  }
+
+  const { supabaseResponse, supabase } = await updateSession(request);
+
+  if (!hasValidTenant) {
+    const { data } = await supabase.auth.getUser();
+    user = data?.user || null;
+    if (user) {
+      hasValidTenant = true;
+      tenantEmail = user.email || null;
+    }
+  }
+
+  if (!hasValidTenant) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
         { error: { code: 'UNAUTHORIZED', message: 'You must be signed in to perform this action.' } },
@@ -95,13 +120,6 @@ export async function proxy(request: NextRequest) {
     }
     return NextResponse.redirect(new URL('/login', request.url));
   }
-
-  // To do role-based access, we would ideally read the role from Supabase JWT (user.user_metadata)
-  // or fetch from our DB. Since this is middleware, fetching from DB (via pg) isn't supported on edge,
-  // but since we are not using edge runtime, we could theoretically import `db` here.
-  // Wait, Next.js middleware currently runs in the Edge runtime by default, which restricts 'pg' driver.
-  // Actually, we can fetch from an internal API route if needed, or assume we set the role in user metadata.
-  // For now, we will forward the user email via headers. The downstream API can verify the DB role.
 
   const requestHeaders = new Headers(supabaseResponse.headers);
   // Strip any existing user headers sent by the client to prevent spoofing
