@@ -24,11 +24,9 @@ export async function sendEmail(params: {
 
     try {
       // 2. Attempt resend.emails.send(...)
-      let rawFrom = (process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev").trim();
-      rawFrom = rawFrom.replace(/^["']|["']$/g, "");
-      const emailMatch = rawFrom.match(/<([^>]+)>/);
-      const cleanFromEmail = emailMatch ? emailMatch[1].trim() : rawFrom.replace(/.*<|>.*/g, "").trim();
-      const formattedFrom = `CrestFix Maintenance <${cleanFromEmail || "onboarding@resend.dev"}>`;
+      const match = String(process.env.RESEND_FROM_EMAIL || "").match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+      const cleanFromEmail = match ? match[0] : "onboarding@resend.dev";
+      const formattedFrom = `CrestFix Maintenance <${cleanFromEmail}>`;
 
       const { data, error } = await resend.emails.send({
         from: formattedFrom,
