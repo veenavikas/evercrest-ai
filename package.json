@@ -15,6 +15,7 @@
     "test:watch": "SKIP_ENV_VALIDATION=true vitest"
   },
   "dependencies": {
+    "@emnapi/runtime": "^1.11.3",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.1",
     "@t3-oss/env-nextjs": "^0.13.11",
