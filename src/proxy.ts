@@ -4,8 +4,18 @@ import { updateSession } from '@/lib/auth/supabase';
 import { rateLimit } from '@/lib/security/rate-limit';
 
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
   const ip = request.headers.get('x-forwarded-for') ?? 'unknown';
+
+  // Automatically catch Supabase ?code= callbacks on any page and forward to auth callback
+  const code = searchParams.get('code');
+  if (code && !pathname.startsWith('/api/auth/callback')) {
+    const callbackUrl = new URL('/api/auth/callback', request.url);
+    callbackUrl.searchParams.set('code', code);
+    const next = searchParams.get('next');
+    if (next) callbackUrl.searchParams.set('next', next);
+    return NextResponse.redirect(callbackUrl);
+  }
 
   // Apply rate limiting to API routes
   if (pathname.startsWith('/api/')) {
