@@ -128,6 +128,7 @@ export async function POST(request: Request) {
       email: targetUser.email,
       role: "admin",
       loginTime: Date.now(),
+      timestamp: Date.now(),
     });
 
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, targetUser.id));

@@ -6,6 +6,7 @@ import { Plus, Search, Shield, User, Building, FileSpreadsheet, Trash2, Edit2, X
 type WhitelistEntry = {
   id: number;
   email: string;
+  fullName?: string | null;
   role: "admin" | "tenant";
   propertyId: number | null;
   propertyCode?: string | null;
@@ -36,12 +37,14 @@ export default function WhitelistPage() {
   const [sortBy, setSortBy] = useState<"code" | "email" | "newest">("code");
   
   // Add form state
+  const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPNum, setNewPNum] = useState("");
   const [newPropertyId, setNewPropertyId] = useState("");
 
   // Edit modal state
   const [editingEntry, setEditingEntry] = useState<WhitelistEntry | null>(null);
+  const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPNum, setEditPNum] = useState("");
   const [editPropertyId, setEditPropertyId] = useState("");
@@ -155,12 +158,14 @@ export default function WhitelistPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: newEmail,
+          fullName: newName,
           role: "tenant",
           propertyId: newPropertyId ? parseInt(newPropertyId) : null,
           propertyCode: newPNum ? newPNum.trim() : null,
         }),
       });
       if (res.ok) {
+        setNewName("");
         setNewEmail("");
         setNewPNum("");
         setNewPropertyId("");
@@ -177,6 +182,7 @@ export default function WhitelistPage() {
   // Handlers for Edit Modal P# and Property Sync
   const startEdit = (entry: WhitelistEntry) => {
     setEditingEntry(entry);
+    setEditName(entry.fullName || "");
     setEditEmail(entry.email);
     setEditPNum(entry.propertyCode || "");
     setEditPropertyId(entry.propertyId ? String(entry.propertyId) : "");
@@ -214,6 +220,7 @@ export default function WhitelistPage() {
         body: JSON.stringify({
           id: editingEntry.id,
           email: editEmail,
+          fullName: editName,
           role: "tenant",
           propertyId: editPropertyId ? parseInt(editPropertyId) : null,
           propertyCode: editPNum ? editPNum.trim() : null,
@@ -296,7 +303,17 @@ export default function WhitelistPage() {
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-2xs space-y-4">
         <h2 className="text-sm font-semibold text-gray-900">Add Whitelisted Resident</h2>
         <form onSubmit={handleAdd} className="flex flex-wrap md:flex-nowrap gap-3 items-end">
-          <div className="flex-1 min-w-[220px]">
+          <div className="w-52">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Resident Full Name</label>
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+              placeholder="e.g. John Doe"
+            />
+          </div>
+          <div className="flex-1 min-w-[200px]">
             <label className="block text-xs font-semibold text-gray-600 mb-1">Resident Email Address</label>
             <input
               type="email"
@@ -307,7 +324,7 @@ export default function WhitelistPage() {
               placeholder="resident@example.com"
             />
           </div>
-          <div className="w-36">
+          <div className="w-32">
             <label className="block text-xs font-semibold text-gray-600 mb-1">P# Code</label>
             <input
               type="text"
@@ -317,7 +334,7 @@ export default function WhitelistPage() {
               placeholder="e.g. P141"
             />
           </div>
-          <div className="w-72">
+          <div className="w-64">
             <label className="block text-xs font-semibold text-gray-600 mb-1">Assigned Property</label>
             <select
               value={newPropertyId}
@@ -357,6 +374,16 @@ export default function WhitelistPage() {
               </button>
             </div>
             <form onSubmit={handleUpdate} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Resident Full Name</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Resident Email Address</label>
                 <input
@@ -426,7 +453,7 @@ export default function WhitelistPage() {
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search email, P#, address..."
+                placeholder="Search name, email, P#, address..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9 pr-3 py-1.5 rounded-xl border border-gray-300 text-xs w-64 focus:outline-none focus:border-blue-500"
@@ -468,7 +495,8 @@ export default function WhitelistPage() {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 border-b border-gray-200 text-slate-600 font-semibold">
               <tr>
-                <th className="px-6 py-3">Resident Whitelisted Email</th>
+                <th className="px-6 py-3">Resident Name</th>
+                <th className="px-6 py-3">Whitelisted Email</th>
                 <th className="px-6 py-3">P# Code</th>
                 <th className="px-6 py-3">Assigned Property Address</th>
                 <th className="px-6 py-3">Added Date</th>
@@ -479,7 +507,8 @@ export default function WhitelistPage() {
               {filteredEntries.length > 0 ? (
                 filteredEntries.map((entry) => (
                   <tr key={entry.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="px-6 py-3.5 font-medium text-slate-900">{entry.email}</td>
+                    <td className="px-6 py-3.5 font-bold text-slate-900">{entry.fullName || "—"}</td>
+                    <td className="px-6 py-3.5 font-medium text-slate-700">{entry.email}</td>
                     <td className="px-6 py-3.5">
                       {entry.propertyCode ? (
                         <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded text-[11px]">

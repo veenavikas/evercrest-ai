@@ -205,6 +205,28 @@ export default function AdminPropertiesPage() {
     }
   };
 
+  const handleToggleActive = async (prop: PropertyItem) => {
+    try {
+      const res = await fetch("/api/admin/properties", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: prop.id,
+          isActive: !prop.isActive,
+        }),
+      });
+
+      if (res.ok) {
+        fetchProperties();
+      } else {
+        const err = await res.json();
+        alert(err.error?.message || "Failed to toggle property active status");
+      }
+    } catch (err) {
+      console.error("Failed to toggle property active status:", err);
+    }
+  };
+
   const handleDeleteProperty = async (id: number, name: string) => {
     if (!confirm(`Are you sure you want to delete property "${name}"? Whitelisted residents will be unlinked.`)) return;
     try {
@@ -657,16 +679,24 @@ export default function AdminPropertiesPage() {
                   </td>
                   <td className="px-6 py-3.5">
                     <div className="space-y-1">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold ${
-                          p.isOccupied
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                      <button
+                        type="button"
+                        onClick={() => handleToggleActive(p)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold cursor-pointer transition-all ${
+                          p.isActive
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100"
+                            : "bg-slate-100 text-slate-500 border border-slate-300 hover:bg-slate-200"
                         }`}
+                        title="Click to toggle Active status"
                       >
-                        {p.isOccupied ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                        {p.isOccupied ? "Active / Occupied" : "Active / Vacant"}
-                      </span>
+                        <input
+                          type="checkbox"
+                          checked={p.isActive}
+                          onChange={() => {}}
+                          className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-0 cursor-pointer pointer-events-none"
+                        />
+                        <span>{p.isActive ? (p.isOccupied ? "Active / Occupied" : "Active / Vacant") : "Disabled / Inactive"}</span>
+                      </button>
                       {p.activeOrderCount > 0 && (
                         <div className="flex items-center gap-1 text-[10px] font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 w-fit">
                           <Wrench size={12} />

@@ -139,7 +139,7 @@ export async function PATCH(request: Request) {
 
     const [updatedProperty] = await db.update(properties).set({
       ...(name ? { name } : {}),
-      code: cleanCode,
+      ...(code !== undefined ? { code: cleanCode } : {}),
       ...(addressLine1 ? { addressLine1 } : {}),
       ...(city ? { city } : {}),
       ...(state ? { state } : {}),

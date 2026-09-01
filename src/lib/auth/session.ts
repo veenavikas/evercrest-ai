@@ -14,12 +14,17 @@ export type SessionPayload = {
 export async function getSession(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
 
+  const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
   // 1. Check dedicated admin session cookie
   try {
     const adminCookie = cookieStore.get("evercrest_admin_session");
     if (adminCookie?.value) {
       const decoded = JSON.parse(Buffer.from(adminCookie.value, "base64").toString("utf-8"));
-      if (decoded.userId && decoded.role === "admin") {
+      // Verify session timestamp against 30-minute timeout
+      if (decoded.timestamp && Date.now() - decoded.timestamp > SESSION_TIMEOUT_MS) {
+        cookieStore.delete("evercrest_admin_session");
+      } else if (decoded.userId && decoded.role === "admin") {
         return {
           userId: Number(decoded.userId),
           email: decoded.email || "admin@evercrest.com",
@@ -37,7 +42,9 @@ export async function getSession(): Promise<SessionPayload | null> {
     const tenantCookie = cookieStore.get("evercrest_tenant_session");
     if (tenantCookie?.value) {
       const decoded = JSON.parse(Buffer.from(tenantCookie.value, "base64").toString("utf-8"));
-      if (decoded.userId && decoded.email) {
+      if (decoded.timestamp && Date.now() - decoded.timestamp > SESSION_TIMEOUT_MS) {
+        cookieStore.delete("evercrest_tenant_session");
+      } else if (decoded.userId && decoded.email) {
         return {
           userId: Number(decoded.userId),
           email: decoded.email,

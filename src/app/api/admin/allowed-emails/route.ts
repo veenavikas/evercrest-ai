@@ -37,6 +37,7 @@ export async function GET() {
       return {
         id: r.id,
         email: r.email,
+        fullName: r.fullName || null,
         role: r.role || "tenant",
         propertyId: r.propertyId || prop?.id || null,
         propertyCode: code,
@@ -63,13 +64,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: { code: "FORBIDDEN", message: "Admin access required" } }, { status: 403 });
     }
 
-    const { email, role, propertyId, propertyCode } = await request.json();
+    const { email, fullName, role, propertyId, propertyCode } = await request.json();
 
     if (!email || typeof email !== "string" || !email.includes("@")) {
       return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Valid email address is required" } }, { status: 400 });
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const cleanName = fullName ? String(fullName).trim() : null;
     const cleanCode = propertyCode ? String(propertyCode).trim() : null;
     let validPropertyId: number | null = null;
 
@@ -102,6 +104,8 @@ export async function POST(request: Request) {
       }
     }
 
+    const cleanRole = role === "admin" ? "admin" : "tenant";
+
     // Check if email already exists in whitelist
     const [existingAllowed] = await db
       .select()
@@ -113,9 +117,10 @@ export async function POST(request: Request) {
       [entry] = await db
         .update(allowedEmails)
         .set({
+          fullName: cleanName || existingAllowed.fullName,
           propertyId: validPropertyId,
           propertyCode: cleanCode,
-          role: "tenant",
+          role: cleanRole,
         })
         .where(eq(allowedEmails.id, existingAllowed.id))
         .returning();
@@ -124,7 +129,8 @@ export async function POST(request: Request) {
         .insert(allowedEmails)
         .values({
           email: cleanEmail,
-          role: "tenant",
+          fullName: cleanName,
+          role: cleanRole,
           propertyId: validPropertyId,
           propertyCode: cleanCode,
           addedBy: validActorId,
@@ -137,12 +143,17 @@ export async function POST(request: Request) {
       await db.insert(users).values({
         username: cleanEmail.split("@")[0],
         email: cleanEmail,
-        fullName: "Whitelisted Resident",
-        role: "tenant",
+        fullName: cleanName || (cleanRole === "admin" ? "CrestFix Admin" : "Whitelisted Resident"),
+        role: cleanRole,
         propertyId: validPropertyId,
       });
-    } else if (validPropertyId) {
-      await db.update(users).set({ propertyId: validPropertyId }).where(eq(users.email, cleanEmail));
+    } else {
+      const updateObject: any = { role: cleanRole };
+      if (validPropertyId) updateObject.propertyId = validPropertyId;
+      if (cleanName) updateObject.fullName = cleanName;
+      if (Object.keys(updateObject).length > 0) {
+        await db.update(users).set(updateObject).where(eq(users.email, cleanEmail));
+      }
     }
 
     try {
@@ -184,7 +195,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: { code: "FORBIDDEN", message: "Admin access required" } }, { status: 403 });
     }
 
-    const { id, email, role, propertyId, propertyCode } = await request.json();
+    const { id, email, fullName, role, propertyId, propertyCode } = await request.json();
     if (!id) {
       return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Entry ID is required for editing" } }, { status: 400 });
     }
@@ -214,6 +225,7 @@ export async function PATCH(request: Request) {
 
     const updateData: any = { role: "tenant" };
     if (email) updateData.email = String(email).trim().toLowerCase();
+    if (fullName !== undefined) updateData.fullName = fullName ? String(fullName).trim() : null;
     if (validPropertyId !== null) updateData.propertyId = validPropertyId;
     if (cleanCode !== null) updateData.propertyCode = cleanCode;
 

@@ -37,6 +37,7 @@ body {
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: #ffffff;
@@ -175,4 +176,51 @@ body {
 
 .report-disclosure[open] summary {
   border-bottom: 1px solid #e4e7e3;
+}
+
+/* ==========================================================================
+   Responsive UI Adjustments for Mobile (360x800), Tablet (768x1024), Desktop (1920x1080)
+   (Test #9 Fix)
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .report-content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-side-column {
+    position: static;
+  }
+
+  .report-hero-card {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .report-metric-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-report {
+    padding: 16px 16px 30px;
+  }
+
+  .report-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .similar-case-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-hero-card {
+    padding: 16px;
+  }
 }

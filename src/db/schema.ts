@@ -58,6 +58,7 @@ export const units = pgTable("units", {
 export const allowedEmails = pgTable("allowed_emails", {
   id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
+  fullName: text("full_name"),
   role: text("role").$type<Role>().notNull().default("tenant"),
   propertyId: integer("property_id").references(() => properties.id), // Added for multi-property
   propertyCode: text("property_code"), // P# Code (e.g. P141, P102, P999)

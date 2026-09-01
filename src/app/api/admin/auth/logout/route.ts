@@ -1,8 +1,25 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-export async function POST() {
+async function handleLogout(request: Request) {
   const cookieStore = await cookies();
   cookieStore.delete("evercrest_admin_session");
-  return NextResponse.redirect(new URL("/admin/login", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"));
+
+  // Check if request expects JSON or HTML navigation
+  const acceptHeader = request.headers.get("accept") || "";
+  if (acceptHeader.includes("application/json")) {
+    return NextResponse.json({ success: true, redirectUrl: "/admin/login" });
+  }
+
+  const redirectUrl = new URL("/admin/login", request.url);
+  return NextResponse.redirect(redirectUrl, 303);
 }
+
+export async function POST(request: Request) {
+  return handleLogout(request);
+}
+
+export async function GET(request: Request) {
+  return handleLogout(request);
+}
+
